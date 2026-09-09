@@ -32,14 +32,14 @@ function renderMatchup(data) {
   if (a) {
     document.getElementById("teamAName").textContent = a.name;
     document.getElementById("teamARecord").textContent =
-      `${a.record?.wins ?? 0}\u2013${a.record?.losses ?? 0}`;
+      `${a.record?.wins ?? 0}–${a.record?.losses ?? 0}`;
     document.getElementById("teamAScore").textContent = a.score?.toFixed(1) ?? "0.0";
     document.getElementById("teamAPlayoff").textContent = `${a.roughPlayoffPct}%`;
   }
   if (b) {
     document.getElementById("teamBName").textContent = b.name;
     document.getElementById("teamBRecord").textContent =
-      `${b.record?.wins ?? 0}\u2013${b.record?.losses ?? 0}`;
+      `${b.record?.wins ?? 0}–${b.record?.losses ?? 0}`;
     document.getElementById("teamBScore").textContent = b.score?.toFixed(1) ?? "0.0";
     document.getElementById("teamBPlayoff").textContent = `${b.roughPlayoffPct}%`;
   }
@@ -56,6 +56,9 @@ function renderMatchup(data) {
     document.getElementById("pfBarB").style.width = `${b.roughPlayoffPct}%`;
   }
 
+  console.log("ROSTER A DATA:", data.rosterA);
+  console.log("ROSTER B DATA:", data.rosterB);
+
   renderRoster("rosterA", data.rosterA);
   renderRoster("rosterB", data.rosterB);
 }
@@ -63,14 +66,17 @@ function renderMatchup(data) {
 function renderRoster(tableId, players) {
   const tbody = document.getElementById(tableId);
   tbody.innerHTML = "";
+
   (players || []).forEach((p) => {
-    const dotClass = p.status === "Playing" ? "playing" : p.status === "Bye" ? "bye" : "final";
     const row = document.createElement("tr");
+
     row.innerHTML = `
       <td>${p.name}</td>
-      <td><span class="status-dot ${dotClass}"></span>${p.status}</td>
-      <td class="mins">${p.left || "\u2014"}</td>
-      <td class="pts">${p.points.toFixed(1)}</td>`;
+      <td>${p.position || "—"}</td>
+      <td class="mins">${p.left || "—"}</td>
+      <td class="pts">${p.points.toFixed(1)}</td>
+    `;
+
     tbody.appendChild(row);
   });
 }
@@ -143,7 +149,7 @@ function buildWheel(labels) {
     text.setAttribute("font-family", "Space Mono, monospace");
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("transform", `rotate(${(mid * 180) / Math.PI + 90}, ${lx}, ${ly})`);
-    text.textContent = label.length > 24 ? label.slice(0, 22) + "\u2026" : label;
+    text.textContent = label.length > 24 ? label.slice(0, 22) + "…" : label;
     wheel.appendChild(text);
   });
 }
@@ -196,7 +202,7 @@ document.getElementById("uploadBtn")?.addEventListener("click", async () => {
   const status = document.getElementById("uploadStatus");
   if (!file) { status.textContent = "Choose a video file first."; return; }
 
-  status.textContent = "Uploading\u2026";
+  status.textContent = "Uploading…";
   try {
     const { data } = await getUploadUrlFn({
       password: window.__spinPassword,
@@ -204,7 +210,7 @@ document.getElementById("uploadBtn")?.addEventListener("click", async () => {
       contentType: file.type
     });
     await fetch(data.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-    status.textContent = "Uploaded! You're off the hook \u2014 for this week.";
+    status.textContent = "Uploaded! You're off the hook — for this week.";
   } catch (err) {
     status.textContent = "Upload failed: " + (err.message || "");
   }

@@ -42,7 +42,7 @@ async function loadWeekConfig() {
     document.getElementById("revealAt").value = d.toISOString().slice(0, 16);
   }
   document.getElementById("wheelStatusText").textContent = c.spinLocked
-    ? `Spun \u2014 landed on: "${c.spinResult}"${c.videoStoragePath ? " (video uploaded)" : " (no video yet)"}`
+    ? `Spun — landed on: "${c.spinResult}"${c.videoStoragePath ? " (video uploaded)" : " (no video yet)"}`
     : "Not spun yet this week.";
 }
 
@@ -107,7 +107,7 @@ document.getElementById("addPunishmentBtn").addEventListener("click", async () =
   try {
     const docRef = await addDoc(collection(db, "punishments"), { text: "New punishment" });
     container.appendChild(punishmentRow(docRef.id, "New punishment"));
-    status.textContent = "Added \u2014 edit the text above.";
+    status.textContent = "Added — edit the text above.";
   } catch (err) {
     status.textContent = "Error: " + err.message;
   }

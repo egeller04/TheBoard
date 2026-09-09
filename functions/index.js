@@ -7,7 +7,7 @@ const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
 const ESPN_S2 = defineSecret("ESPN_S2");
-const ESPN_SWID = defineSecret("ESPN_SWID");
+const ESPN_SWID = defineSecret("SWID");
 
 // ---- League constants ----
 // If the league ID or season ever changes, update here.
@@ -22,6 +22,16 @@ const PRO_TEAM_MAP = {
   15: "MIA", 16: "MIN", 17: "NE", 18: "NO", 19: "NYG", 20: "NYJ", 21: "PHI",
   22: "ARI", 23: "PIT", 24: "LAC", 25: "SF", 26: "SEA", 27: "TB", 28: "WSH",
   29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU"
+};
+
+const STARTER_SLOTS = {
+  0: "QB",
+  2: "RB",
+  4: "WR",
+  6: "TE",
+  16: "D/ST",
+  17: "K",
+  23: "FLEX"
 };
 
 async function fetchEspnLeague(scoringPeriodId) {
@@ -76,36 +86,61 @@ function buildRoster(leagueData, teamId, week, gameClocks) {
       m.matchupPeriodId === week &&
       (m.home?.teamId === teamId || m.away?.teamId === teamId)
   );
+
   if (!matchup) return { players: [], total: 0 };
 
-  const side = matchup.home?.teamId === teamId ? matchup.home : matchup.away;
-  const entries = side?.rosterForCurrentScoringPeriod?.entries || [];
+  const side =
+    matchup.home?.teamId === teamId ? matchup.home : matchup.away;
+
+  const team = (leagueData.teams || []).find(
+    (t) => t.id === teamId
+  );
+
+  const STARTER_SLOTS = {
+    0: "QB",
+    2: "RB",
+    4: "WR",
+    6: "TE",
+    16: "D/ST",
+    17: "K",
+    23: "FLEX"
+  };
+
+  const entries = (team?.roster?.entries || []).filter(
+    (entry) => STARTER_SLOTS[entry.lineupSlotId]
+  );
 
   const players = entries.map((entry) => {
     const p = entry.playerPoolEntry.player;
+
+    console.log("POSITION DEBUG:", {
+      player: p.fullName,
+      lineupSlotId: entry.lineupSlotId,
+      type: typeof entry.lineupSlotId,
+      mappedPosition: STARTER_SLOTS[entry.lineupSlotId]
+    });
+
     const abbr = PRO_TEAM_MAP[p.proTeamId] || null;
     const game = abbr ? gameClocks[abbr] : null;
 
-    let status = "Bye";
     let left = null;
-    if (game) {
-      if (game.state === "pre") status = "Upcoming";
-      else if (game.state === "in") {
-        status = "Playing";
-        left = `Q${game.period} ${game.clock}`;
-      } else status = "Final";
+
+    if (game?.state === "in") {
+      left = `Q${game.period} ${game.clock}`;
     }
 
     return {
       name: p.fullName,
-      position: p.defaultPositionId,
-      status,
+      position: STARTER_SLOTS[entry.lineupSlotId],
       left,
       points: entry.playerPoolEntry.appliedStatTotal ?? 0
     };
   });
 
-  return { players, total: side?.totalPoints ?? 0 };
+  return {
+    players,
+    total: side?.totalPoints ?? 0
+  };
 }
 
 // Callable from the front end — returns the current Game of the Week's
@@ -126,11 +161,30 @@ exports.getMatchup = onCall(
     const gameClocks = buildGameClockMap(nflData);
 
     const teams = leagueData.teams || [];
+
+    console.log("TEAM IMAGE DEBUG:", teams.map(t => ({
+      id: t.id,
+      name: t.name,
+      logo: t.logo,
+      managers: t.managers
+    })));
+
     const teamA = teams.find((t) => t.id === config.teamAId);
     const teamB = teams.find((t) => t.id === config.teamBId);
 
-    const rosterA = buildRoster(leagueData, config.teamAId, config.week, gameClocks);
-    const rosterB = buildRoster(leagueData, config.teamBId, config.week, gameClocks);
+    const rosterA = buildRoster(
+      leagueData,
+      config.teamAId,
+      config.week,
+      gameClocks
+    );
+
+    const rosterB = buildRoster(
+      leagueData,
+      config.teamBId,
+      config.week,
+      gameClocks
+    );
 
     // NOTE: ESPN doesn't expose their internal playoff-simulation
     // percentages through this API. This is a placeholder based on
@@ -138,20 +192,24 @@ exports.getMatchup = onCall(
     function roughPlayoffOdds(team) {
       const wins = team?.record?.overall?.wins ?? 0;
       const losses = team?.record?.overall?.losses ?? 0;
-      const games = wins + losses || 1;
-      return Math.round((wins / games) * 100);
+
+      const odds = 50 + (wins - losses) * 10;
+
+      return Math.max(5, Math.min(95, odds));
     }
 
     return {
       week: config.week,
       teamA: teamA && {
         name: teamA.name,
+        logo: teamA.logo,
         record: teamA.record?.overall,
         score: rosterA.total,
         roughPlayoffPct: roughPlayoffOdds(teamA)
       },
       teamB: teamB && {
         name: teamB.name,
+        logo: teamB.logo,
         record: teamB.record?.overall,
         score: rosterB.total,
         roughPlayoffPct: roughPlayoffOdds(teamB)

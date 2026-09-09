@@ -44,6 +44,7 @@
   .team .record{font-family:'Space Mono',monospace; font-size:12px; color:var(--blue);}
   .team .score{font-family:'Space Mono',monospace; font-size:48px; font-weight:700; margin-top:4px;}
   .team .score.leading{color:var(--blue);}
+  .team-logo {width: 64px; height: 64px; object-fit: contain; flex-shrink: 0;}
   .vs-col{display:flex; flex-direction:column; align-items:center; gap:4px;}
   .vs-col .vs{font-family:'Space Mono',monospace; color:var(--steel); font-size:12px;}
 
@@ -69,10 +70,6 @@
   .roster-col table{width:100%; border-collapse:collapse; font-size:12.5px;}
   .roster-col th{text-align:left; font-size:10px; color:var(--steel); text-transform:uppercase; letter-spacing:.05em; padding-bottom:6px; border-bottom:1px solid var(--line); font-weight:600;}
   .roster-col td{padding:7px 0; border-bottom:1px solid var(--panel);}
-  .status-dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px;}
-  .status-dot.playing{background:var(--blue);}
-  .status-dot.final{background:#9AA6BC;}
-  .status-dot.bye{background:#DCE4F0; border:1px solid var(--steel);}
   .mins{font-family:'Space Mono',monospace; color:var(--steel); font-size:11px;}
   .pts{font-family:'Space Mono',monospace; font-weight:700;}
 
@@ -140,40 +137,40 @@
 <section class="hero">
   <div class="wordmark">THE BOARD</div>
   <div class="hero-content">
-    <div class="week-tag"><span class="dot"></span><span id="weekTag">WEEK \u2014</span> &nbsp;\u00b7&nbsp; LIVE</div>
+    <div class="week-tag"><span class="dot"></span><span id="weekTag">WEEK</span> — LIVE</div>
 
     <div id="matchupError" class="error-note"></div>
 
     <div class="matchup-card">
       <div class="matchup-top">
         <div class="team">
-          <div class="name" id="teamAName">\u2014</div>
-          <div class="record" id="teamARecord">\u2014</div>
+          <div class="name" id="teamAName">—</div>
+          <div class="record" id="teamARecord">—</div>
           <div class="score" id="teamAScore">0.0</div>
         </div>
-        <div class="vs-col"><div class="vs">VS</div></div>
+        <div class="vs-col"><div class="vs">VS</div>—</div>
         <div class="team right">
-          <div class="name" id="teamBName">\u2014</div>
-          <div class="record" id="teamBRecord">\u2014</div>
+          <div class="name" id="teamBName">—</div>
+          <div class="record" id="teamBRecord">—</div>
           <div class="score" id="teamBScore">0.0</div>
         </div>
       </div>
 
       <div class="playoff-section">
-        <div class="lbl">Playoff Odds (rough estimate)</div>
+        <div class="lbl">Playoff Odds</div>
         <div class="playoff-bars">
           <div class="p-row">
-            <div class="name" id="pfNameA">\u2014</div>
+            <div class="name" id="pfNameA">—</div>
             <div class="bar-track"><div class="bar-fill" id="pfBarA" style="width:0%"></div></div>
-            <div class="bar-label" id="teamAPlayoff">\u2014</div>
+            <div class="bar-label" id="teamAPlayoff">—</div>
           </div>
           <div class="p-row">
-            <div class="name" id="pfNameB">\u2014</div>
+            <div class="name" id="pfNameB">—</div>
             <div class="bar-track"><div class="bar-fill" id="pfBarB" style="width:0%"></div></div>
-            <div class="bar-label" id="teamBPlayoff">\u2014</div>
+            <div class="bar-label" id="teamBPlayoff">—</div>
           </div>
         </div>
-        <div class="playoff-caveat">Based on season record only \u2014 not ESPN's full simulation.</div>
+        <div class="playoff-caveat">Based on season record.</div>
       </div>
 
       <div class="roster-section">
@@ -181,14 +178,14 @@
         <div class="roster-grid">
           <div class="roster-col">
             <table>
-              <thead><tr><th>Player</th><th>Status</th><th>Left</th><th>Pts</th></tr></thead>
-              <tbody id="rosterA"></tbody>
+        <thead><tr><th>Player</th><th>Pos</th><th>Time</th><th>Pts</th></tr></thead>
+        <tbody id="rosterA"></tbody>
             </table>
           </div>
           <div class="roster-col">
             <table>
-              <thead><tr><th>Player</th><th>Status</th><th>Left</th><th>Pts</th></tr></thead>
-              <tbody id="rosterB"></tbody>
+        <thead><tr><th>Player</th><th>Pos</th><th>Time</th><th>Pts</th></tr></thead>
+        <tbody id="rosterB"></tbody>
             </table>
           </div>
         </div>
@@ -232,7 +229,7 @@
   </div>
 </section>
 
-<footer>THE BOARD &nbsp;\u00b7&nbsp; <a href="admin.html" style="color:inherit;">admin</a></footer>
+<footer>THE BOARD · <a href="admin.html" style="color:inherit;">admin</a></footer>
 
 <div class="lock-overlay" id="lockOverlay">
   <div class="lock-card">

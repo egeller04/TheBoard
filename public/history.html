@@ -54,7 +54,7 @@
 </nav>
 
 <div class="page-head"><h1>Past Games of the Week</h1><p>Every loser's fate, on the record.</p></div>
-<div class="game-list" id="gameList"><div class="empty-note">Loading\u2026</div></div>
+<div class="game-list" id="gameList"><div class="empty-note">Loading…</div></div>
 
 <script type="module">
   import { db } from "./js/firebase-init.js";
@@ -67,7 +67,7 @@
     const q = query(collection(db, "history"), orderBy("week", "desc"));
     const snap = await getDocs(q);
     if (snap.empty) {
-      listEl.innerHTML = '<div class="empty-note">No past games yet \u2014 check back after Week 1.</div>';
+      listEl.innerHTML = '<div class="empty-note">No past games yet check back after Week 1.</div>';
       return;
     }
     listEl.innerHTML = "";
@@ -96,12 +96,12 @@
             <div class="score">${Number(g.loserScore).toFixed(1)}</div>
           </div>
         </div>
-        <div class="odds-line">CLOSING SPREAD: ${g.closingSpread || "\u2014"} &nbsp;\u00b7&nbsp; O/U ${g.overUnder || "\u2014"}</div>
+        <div class="odds-line">CLOSING SPREAD: ${g.closingSpread || "—"} · O/U ${g.overUnder || "—"}</div>
         <div class="punishment-block">
           <div class="video-slot">${videoHtml}</div>
           <div class="punishment-text">
             <div class="lbl">Punishment</div>
-            <div class="txt">${g.punishmentText || "\u2014"}</div>
+            <div class="txt">${g.punishmentText || "—"}</div>
           </div>
         </div>
       </div>`;
