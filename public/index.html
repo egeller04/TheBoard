@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Board — Game of the Week</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEF2F9; --card:#FFFFFF; --panel:#E4EAF6; --panel-2:#DCE6F7; --line:#D2DCEE;
+    --navy:#0B1F3A; --blue:#1D5CD1; --blue-dim:#AFC6EE; --gold:#E8A93B; --red:#D7263D; --steel:#5C6B85;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0; background:var(--bg); color:var(--navy); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden;}
+  .display{font-family:'Anton',sans-serif; letter-spacing:0.01em;}
+  .mono{font-family:'Space Mono',monospace;}
+
+  nav{display:flex; justify-content:space-between; align-items:center; padding:20px 40px; border-bottom:1px solid var(--line); position:relative; z-index:3; background:var(--bg);}
+  .brand{display:flex; align-items:baseline; gap:10px;}
+  .brand .display{font-size:20px; color:var(--navy);}
+  .brand .tag{font-size:11px; color:var(--blue); font-family:'Space Mono',monospace;}
+  .nav-links{display:flex; gap:26px; font-size:14px; color:var(--steel);}
+  .nav-links span, .nav-links a{cursor:pointer; text-decoration:none; color:inherit;}
+  .nav-links span:hover, .nav-links a:hover{color:var(--navy);}
+
+  .hero{position:relative; padding:50px 40px 30px; text-align:center; overflow:hidden;}
+  .wordmark{position:absolute; top:-2vw; left:50%; transform:translateX(-50%); font-family:'Anton',sans-serif; font-size:19vw; line-height:1; color:var(--blue); opacity:0.06; white-space:nowrap; z-index:0; pointer-events:none; user-select:none;}
+  .hero-content{position:relative; z-index:1;}
+
+  .week-tag{font-family:'Space Mono',monospace; font-size:12px; color:var(--blue); border:1px solid var(--blue-dim); display:inline-block; padding:5px 14px; border-radius:20px; margin-bottom:20px; background:var(--panel);}
+  .week-tag .dot{display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--red); margin-right:8px; animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  .error-note{max-width:960px; margin:0 auto 16px; background:#FBEAEA; border:1px solid #E9C4C4; color:#8A2A2A; font-family:'Space Mono',monospace; font-size:12px; padding:10px 14px; border-radius:6px; display:none;}
+
+  .matchup-card{max-width:960px; margin:0 auto; position:relative; z-index:1; background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 34px rgba(11,31,58,0.10); overflow:hidden; text-align:left;}
+  .matchup-top{display:grid; grid-template-columns:1fr auto 1fr; align-items:center; padding:32px 30px; gap:16px;}
+  .team{display:flex; flex-direction:column; gap:6px;}
+  .team.right{align-items:flex-end; text-align:right;}
+  .team .name{font-size:22px; font-weight:700;}
+  .team .record{font-family:'Space Mono',monospace; font-size:12px; color:var(--blue);}
+  .team .score{font-family:'Space Mono',monospace; font-size:48px; font-weight:700; margin-top:4px;}
+  .team .score.leading{color:var(--blue);}
+  .vs-col{display:flex; flex-direction:column; align-items:center; gap:4px;}
+  .vs-col .vs{font-family:'Space Mono',monospace; color:var(--steel); font-size:12px;}
+
+  .stat-strip{display:grid; grid-template-columns:repeat(2,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  .stat-strip div{padding:16px; text-align:center; border-right:1px solid var(--line);}
+  .stat-strip div:last-child{border-right:none;}
+  .stat-strip .lbl{font-size:10px; color:var(--steel); letter-spacing:.06em; text-transform:uppercase;}
+  .stat-strip .val{font-family:'Space Mono',monospace; font-size:15px; margin-top:4px; font-weight:700;}
+
+  .playoff-section{padding:22px 30px; border-bottom:1px solid var(--line);}
+  .playoff-section .lbl{font-size:11px; color:var(--steel); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;}
+  .playoff-bars{display:flex; flex-direction:column; gap:10px;}
+  .p-row{display:grid; grid-template-columns:110px 1fr 1fr; align-items:center; gap:10px; font-size:12px;}
+  .p-row .name{color:var(--navy); font-weight:600;}
+  .bar-track{background:var(--panel); border-radius:20px; height:10px; overflow:hidden; position:relative;}
+  .bar-fill{height:100%; border-radius:20px; background:var(--blue);}
+  .bar-label{font-family:'Space Mono',monospace; font-size:11px; color:var(--steel);}
+  .playoff-caveat{font-size:10px; color:var(--steel); margin-top:8px; font-family:'Space Mono',monospace;}
+
+  .roster-section{padding:22px 30px;}
+  .roster-section .lbl{font-size:11px; color:var(--steel); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px;}
+  .roster-grid{display:grid; grid-template-columns:1fr 1fr; gap:24px;}
+  .roster-col table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .roster-col th{text-align:left; font-size:10px; color:var(--steel); text-transform:uppercase; letter-spacing:.05em; padding-bottom:6px; border-bottom:1px solid var(--line); font-weight:600;}
+  .roster-col td{padding:7px 0; border-bottom:1px solid var(--panel);}
+  .status-dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px;}
+  .status-dot.playing{background:var(--blue);}
+  .status-dot.final{background:#9AA6BC;}
+  .status-dot.bye{background:#DCE4F0; border:1px solid var(--steel);}
+  .mins{font-family:'Space Mono',monospace; color:var(--steel); font-size:11px;}
+  .pts{font-family:'Space Mono',monospace; font-weight:700;}
+
+  .countdown-section{max-width:960px; margin:34px auto 0; display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:20px 6px; position:relative; z-index:1;}
+  .countdown-label{font-size:13px; color:var(--steel);}
+  .countdown-label b{color:var(--navy); display:block; font-size:15px; margin-top:2px;}
+  .countdown-clock{display:flex; gap:16px;}
+  .clock-unit{text-align:center;}
+  .clock-unit .num{font-family:'Space Mono',monospace; font-size:26px; color:var(--blue);}
+  .clock-unit .lbl{font-size:9px; color:var(--steel); letter-spacing:.06em;}
+
+  .wheel-section{background:var(--navy); border-top:1px solid var(--line); margin-top:60px; padding:64px 40px 80px;}
+  .wheel-inner{max-width:1000px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:60px; align-items:center;}
+  .wheel-copy .kicker{color:var(--gold); font-family:'Space Mono',monospace; font-size:12px; letter-spacing:.08em;}
+  .wheel-copy h2{font-family:'Anton',sans-serif; font-size:38px; margin:10px 0 16px; line-height:1.05; color:#fff;}
+  .wheel-copy p{color:var(--blue-dim); font-size:15px; line-height:1.6; max-width:38ch;}
+  .lock-note{margin-top:24px; padding:14px 16px; border:1px dashed rgba(255,255,255,.25); background:rgba(255,255,255,.06); font-family:'Space Mono',monospace; font-size:12px; color:var(--blue-dim); border-radius:6px;}
+  .lock-note b{color:#fff;}
+
+  .wheel-stage{position:relative; display:flex; flex-direction:column; align-items:center;}
+  .wheel-wrap{position:relative; width:320px; height:320px;}
+  .pointer{position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent; border-top:22px solid var(--blue); z-index:5;}
+  #wheel{width:100%; height:100%; border-radius:50%; border:4px solid var(--bg); box-shadow:0 6px 24px rgba(11,31,58,.12); transition:transform 4.5s cubic-bezier(.12,.85,.13,1); display:block;}
+  .hub{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:54px; height:54px; border-radius:50%; background:#fff; border:3px solid var(--gold); display:flex; align-items:center; justify-content:center; font-family:'Anton',sans-serif; font-size:10px; color:var(--navy); z-index:4; text-align:center; line-height:1.1;}
+  .login-btn{margin-top:28px; background:var(--navy); color:#fff; border:none; padding:14px 34px; font-family:'Anton',sans-serif; font-size:15px; letter-spacing:.03em; border-radius:6px; cursor:pointer;}
+  .login-btn:hover{background:var(--blue);}
+  .spin-result{margin-top:16px; min-height:22px; font-family:'Space Mono',monospace; font-size:13px; color:var(--blue-dim); text-align:center; font-weight:700;}
+
+  .lock-overlay{position:fixed; inset:0; background:rgba(11,31,58,.45); display:none; align-items:center; justify-content:center; z-index:50; backdrop-filter:blur(3px);}
+  .lock-overlay.show{display:flex;}
+  .lock-card{background:#fff; border:1px solid var(--line); padding:40px 36px; width:min(90vw,380px); text-align:center; border-radius:10px; box-shadow:0 20px 50px rgba(11,31,58,.2);}
+  .lock-card .display{font-size:22px; color:var(--navy); margin-bottom:6px;}
+  .lock-card p{color:var(--steel); font-size:13px; margin:0 0 22px;}
+  .lock-card input{width:100%; background:var(--panel); border:1px solid var(--line); color:var(--navy); padding:12px 14px; font-family:'Space Mono',monospace; font-size:14px; border-radius:6px; margin-bottom:14px;}
+  .lock-card button{width:100%; background:var(--blue); color:#fff; border:none; padding:12px; font-family:'Anton',sans-serif; font-size:14px; border-radius:6px; cursor:pointer;}
+  .lock-close{margin-top:14px; font-size:12px; color:var(--steel); cursor:pointer; text-decoration:underline;}
+  .pw-error{color:var(--red); font-size:12px; font-family:'Space Mono',monospace; min-height:16px; margin-top:-6px; margin-bottom:10px;}
+  .spin-real-btn{width:100%; margin-top:6px; background:var(--red); color:#fff; border:none; padding:14px 34px; font-family:'Anton',sans-serif; font-size:15px; border-radius:6px; cursor:pointer;}
+  .spin-real-btn:disabled{background:#e6b4bb; cursor:not-allowed;}
+  .upload-section{margin-top:18px; text-align:left;}
+  .upload-section input[type=file]{width:100%; font-size:12px; margin-bottom:10px;}
+  .upload-section button{width:100%; background:var(--navy); color:#fff; border:none; padding:10px; border-radius:6px; font-family:'Space Mono',monospace; font-size:12px; cursor:pointer;}
+  .upload-status{font-size:11px; color:var(--steel); margin-top:8px; font-family:'Space Mono',monospace;}
+
+  footer{text-align:center; padding:36px; color:var(--steel); font-size:12px; font-family:'Space Mono',monospace;}
+
+  @media (max-width:760px){
+    .matchup-top{grid-template-columns:1fr;} .team.right{align-items:flex-start; text-align:left;}
+    .vs-col{order:3; padding:6px 0;} .roster-grid{grid-template-columns:1fr;}
+    .wheel-inner{grid-template-columns:1fr;} .countdown-section{flex-direction:column; gap:16px; align-items:flex-start;}
+    .wordmark{font-size:30vw; top:6vw;}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand"><span class="display">THE BOARD</span><span class="tag">// GAME OF THE WEEK</span></div>
+  <div class="nav-links">
+    <a href="history.html">Past Games</a>
+    <span onclick="document.getElementById('wheelSection').scrollIntoView({behavior:'smooth'})">Wheel Unfortunate</span>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="wordmark">THE BOARD</div>
+  <div class="hero-content">
+    <div class="week-tag"><span class="dot"></span><span id="weekTag">WEEK \u2014</span> &nbsp;\u00b7&nbsp; LIVE</div>
+
+    <div id="matchupError" class="error-note"></div>
+
+    <div class="matchup-card">
+      <div class="matchup-top">
+        <div class="team">
+          <div class="name" id="teamAName">\u2014</div>
+          <div class="record" id="teamARecord">\u2014</div>
+          <div class="score" id="teamAScore">0.0</div>
+        </div>
+        <div class="vs-col"><div class="vs">VS</div></div>
+        <div class="team right">
+          <div class="name" id="teamBName">\u2014</div>
+          <div class="record" id="teamBRecord">\u2014</div>
+          <div class="score" id="teamBScore">0.0</div>
+        </div>
+      </div>
+
+      <div class="playoff-section">
+        <div class="lbl">Playoff Odds (rough estimate)</div>
+        <div class="playoff-bars">
+          <div class="p-row">
+            <div class="name" id="pfNameA">\u2014</div>
+            <div class="bar-track"><div class="bar-fill" id="pfBarA" style="width:0%"></div></div>
+            <div class="bar-label" id="teamAPlayoff">\u2014</div>
+          </div>
+          <div class="p-row">
+            <div class="name" id="pfNameB">\u2014</div>
+            <div class="bar-track"><div class="bar-fill" id="pfBarB" style="width:0%"></div></div>
+            <div class="bar-label" id="teamBPlayoff">\u2014</div>
+          </div>
+        </div>
+        <div class="playoff-caveat">Based on season record only \u2014 not ESPN's full simulation.</div>
+      </div>
+
+      <div class="roster-section">
+        <div class="lbl">Live Rosters</div>
+        <div class="roster-grid">
+          <div class="roster-col">
+            <table>
+              <thead><tr><th>Player</th><th>Status</th><th>Left</th><th>Pts</th></tr></thead>
+              <tbody id="rosterA"></tbody>
+            </table>
+          </div>
+          <div class="roster-col">
+            <table>
+              <thead><tr><th>Player</th><th>Status</th><th>Left</th><th>Pts</th></tr></thead>
+              <tbody id="rosterB"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="countdown-section">
+  <div class="countdown-label">Next Game of the Week<b>Reveals Thursday morning</b></div>
+  <div class="countdown-clock">
+    <div class="clock-unit"><div class="num" id="cd-d">--</div><div class="lbl">DAYS</div></div>
+    <div class="clock-unit"><div class="num" id="cd-h">--</div><div class="lbl">HRS</div></div>
+    <div class="clock-unit"><div class="num" id="cd-m">--</div><div class="lbl">MIN</div></div>
+    <div class="clock-unit"><div class="num" id="cd-s">--</div><div class="lbl">SEC</div></div>
+  </div>
+</div>
+
+<section class="wheel-section" id="wheelSection">
+  <div class="wheel-inner">
+    <div class="wheel-copy">
+      <div class="kicker">LOSER'S FATE</div>
+      <h2>Wheel<br>Unfortunate</h2>
+      <p>This week's Game of the Week loser logs in below to spin. Whatever it lands on, they owe the league a video by Sunday.</p>
+      <div class="lock-note"><b>Locked to this week's loser.</b> Log in with the weekly password to unlock your one spin. The result freezes on screen until a punishment video is uploaded.</div>
+    </div>
+    <div class="wheel-stage">
+      <div class="wheel-wrap">
+        <div class="pointer"></div>
+        <svg id="wheel" viewBox="0 0 300 300"></svg>
+        <div class="hub">SPIN<br>ME</div>
+      </div>
+      <button class="login-btn" id="loginBtn">LOG IN TO SPIN</button>
+      <div class="spin-result" id="spinResult"></div>
+      <div class="upload-section" id="uploadSection" style="display:none;">
+        <input type="file" id="videoFile" accept="video/*">
+        <button id="uploadBtn">Upload punishment video</button>
+        <div class="upload-status" id="uploadStatus"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>THE BOARD &nbsp;\u00b7&nbsp; <a href="admin.html" style="color:inherit;">admin</a></footer>
+
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-card">
+    <div class="display">LOSER'S ENTRANCE</div>
+    <p>Enter this week's password to unlock your spin.</p>
+    <div id="pwGate">
+      <input type="password" placeholder="Weekly password" id="pwInput">
+      <div class="pw-error" id="pwError"></div>
+      <button id="unlockBtn">Unlock</button>
+    </div>
+    <div id="unlockedArea" style="display:none;">
+      <button class="spin-real-btn" id="spinBtn">SPIN THE WHEEL</button>
+    </div>
+    <div class="lock-close">cancel</div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

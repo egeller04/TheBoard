@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Board — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#EEF2F9; --card:#FFFFFF; --panel:#E4EAF6; --line:#D2DCEE; --navy:#0B1F3A; --blue:#1D5CD1; --red:#D7263D; --steel:#5C6B85;}
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--navy); font-family:'Inter',sans-serif; padding-bottom:60px;}
+  .display{font-family:'Anton',sans-serif;}
+  nav{display:flex; justify-content:space-between; align-items:center; padding:20px 40px; border-bottom:1px solid var(--line);}
+  .brand .display{font-size:20px;}
+  .brand .tag{font-size:11px; color:var(--blue); font-family:'Space Mono',monospace; margin-left:10px;}
+  a{color:var(--steel); text-decoration:none; font-size:14px;}
+  a:hover{color:var(--navy);}
+
+  .wrap{max-width:640px; margin:40px auto; padding:0 20px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:24px; margin-bottom:24px; box-shadow:0 6px 20px rgba(11,31,58,.05);}
+  .card h2{font-family:'Anton',sans-serif; font-size:18px; margin:0 0 16px; font-weight:400;}
+  label{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--steel); margin-bottom:4px; margin-top:14px;}
+  input, select, textarea{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px; font-family:'Inter',sans-serif; font-size:14px; background:var(--panel); color:var(--navy);}
+  button{margin-top:16px; background:var(--blue); color:#fff; border:none; padding:11px 20px; border-radius:6px; font-family:'Anton',sans-serif; font-size:13px; cursor:pointer;}
+  button.secondary{background:var(--navy);}
+  button.danger{background:var(--red);}
+  .status-msg{font-size:12px; font-family:'Space Mono',monospace; margin-top:10px; min-height:16px;}
+  .punishment-row{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+  .punishment-row input{flex:1;}
+  .punishment-row button{margin:0; padding:8px 12px; background:var(--red);}
+  #loginScreen{max-width:360px; margin:100px auto;}
+  #adminBody{display:none;}
+  .hint{font-size:11px; color:var(--steel); margin-top:6px;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand"><span class="display">THE BOARD</span><span class="tag">// ADMIN</span></div>
+  <a href="index.html">View site</a>
+</nav>
+
+<div class="wrap">
+  <div id="loginScreen" class="card">
+    <h2>Admin Login</h2>
+    <label>Email</label>
+    <input type="email" id="loginEmail">
+    <label>Password</label>
+    <input type="password" id="loginPassword">
+    <button id="loginSubmit">Log in</button>
+    <div class="status-msg" id="loginStatus"></div>
+    <div class="hint">Create your account first in Firebase Console \u2192 Authentication \u2192 Add user.</div>
+  </div>
+
+  <div id="adminBody">
+    <div class="card">
+      <h2>This Week's Game</h2>
+      <label>Week number</label>
+      <input type="number" id="weekNumber">
+      <label>Team A — ESPN Team ID</label>
+      <input type="number" id="teamAId">
+      <label>Team B — ESPN Team ID</label>
+      <input type="number" id="teamBId">
+      <div class="hint">Team IDs come from your ESPN league — I can help you look these up once the getMatchup function is deployed and we've confirmed it connects.</div>
+      <label>Weekly password (for the loser to spin)</label>
+      <input type="text" id="weeklyPassword">
+      <label>Reveal date/time for next matchup</label>
+      <input type="datetime-local" id="revealAt">
+      <button id="saveWeekBtn">Save week settings</button>
+      <div class="status-msg" id="weekStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Wheel Status</h2>
+      <div id="wheelStatusText" class="hint">Loading\u2026</div>
+      <button class="secondary" id="resetWheelBtn">Reset wheel for this week</button>
+      <div class="status-msg" id="resetStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Punishment List</h2>
+      <div id="punishmentRows"></div>
+      <button class="secondary" id="addPunishmentBtn">+ Add punishment</button>
+      <div class="status-msg" id="punishmentStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Archive Completed Week</h2>
+      <label>Winner name</label><input type="text" id="archWinnerName">
+      <label>Winner score</label><input type="number" step="0.1" id="archWinnerScore">
+      <label>Loser name</label><input type="text" id="archLoserName">
+      <label>Loser score</label><input type="number" step="0.1" id="archLoserScore">
+      <label>Closing spread</label><input type="text" id="archSpread">
+      <label>Over/Under</label><input type="text" id="archOU">
+      <button class="danger" id="archiveBtn">Archive this week to Past Games</button>
+      <div class="status-msg" id="archiveStatus"></div>
+      <div class="hint">This copies the info above (plus the wheel result and uploaded video, if any) into the Past Games page, then resets the wheel lock so next week starts clean.</div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/admin.js"></script>
+</body>
+</html>

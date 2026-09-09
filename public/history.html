@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Board — Past Games</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#EEF2F9; --card:#FFFFFF; --panel:#E4EAF6; --line:#D2DCEE; --navy:#0B1F3A; --blue:#1D5CD1; --blue-dim:#AFC6EE; --gold:#E8A93B; --red:#D7263D; --steel:#5C6B85;}
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--navy); font-family:'Inter',sans-serif;}
+  .display{font-family:'Anton',sans-serif;}
+  nav{display:flex; justify-content:space-between; align-items:center; padding:20px 40px; border-bottom:1px solid var(--line);}
+  .brand{display:flex; align-items:baseline; gap:10px;}
+  .brand .display{font-size:20px;}
+  .brand .tag{font-size:11px; color:var(--blue); font-family:'Space Mono',monospace;}
+  .nav-links a{color:var(--steel); text-decoration:none; font-size:14px;}
+  .nav-links a:hover{color:var(--navy);}
+  .page-head{max-width:760px; margin:44px auto 30px; padding:0 20px;}
+  .page-head h1{font-family:'Anton',sans-serif; font-size:34px; margin:0 0 6px;}
+  .page-head p{color:var(--steel); font-size:14px; margin:0;}
+  .game-list{max-width:760px; margin:0 auto 60px; padding:0 20px; display:flex; flex-direction:column; gap:22px;}
+  .empty-note{color:var(--steel); font-family:'Space Mono',monospace; font-size:13px;}
+  .game-card{border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--card); box-shadow:0 6px 20px rgba(11,31,58,0.06);}
+  .card-head{display:flex; justify-content:space-between; align-items:center; padding:14px 20px; background:var(--panel); border-bottom:1px solid var(--line); font-family:'Space Mono',monospace; font-size:12px; color:var(--steel);}
+  .card-body{padding:20px;}
+  .score-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
+  .side{display:flex; flex-direction:column; gap:2px;}
+  .side.loser{opacity:.55; align-items:flex-end; text-align:right;}
+  .tag-line{font-size:10px; letter-spacing:.06em; text-transform:uppercase; font-family:'Space Mono',monospace;}
+  .side.winner .tag-line{color:var(--blue);}
+  .side.loser .tag-line{color:var(--red);}
+  .name{font-size:17px; font-weight:700;}
+  .score{font-family:'Space Mono',monospace; font-size:22px; margin-top:2px;}
+  .mid-vs{color:var(--steel); font-family:'Space Mono',monospace; font-size:12px;}
+  .odds-line{font-family:'Space Mono',monospace; font-size:11.5px; color:var(--steel); border-top:1px solid var(--panel); padding-top:12px; margin-bottom:16px;}
+  .punishment-block{display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:stretch;}
+  .video-slot{background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .video-slot video{width:100%; height:100%; display:block; object-fit:cover;}
+  .video-slot .placeholder{aspect-ratio:16/10; display:flex; align-items:center; justify-content:center; color:var(--steel); font-family:'Space Mono',monospace; font-size:12px; text-align:center; padding:10px;}
+  .punishment-text{display:flex; flex-direction:column; justify-content:center; gap:8px;}
+  .punishment-text .lbl{font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--steel); font-family:'Space Mono',monospace;}
+  .punishment-text .txt{font-size:14px; color:var(--navy); line-height:1.4;}
+  @media (max-width:520px){.punishment-block{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand"><span class="display">THE BOARD</span><span class="tag">// PAST GAMES</span></div>
+  <div class="nav-links"><a href="index.html">Back to Current Matchup</a></div>
+</nav>
+
+<div class="page-head"><h1>Past Games of the Week</h1><p>Every loser's fate, on the record.</p></div>
+<div class="game-list" id="gameList"><div class="empty-note">Loading\u2026</div></div>
+
+<script type="module">
+  import { db } from "./js/firebase-init.js";
+  import { collection, getDocs, query, orderBy }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const listEl = document.getElementById("gameList");
+
+  async function loadHistory() {
+    const q = query(collection(db, "history"), orderBy("week", "desc"));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      listEl.innerHTML = '<div class="empty-note">No past games yet \u2014 check back after Week 1.</div>';
+      return;
+    }
+    listEl.innerHTML = "";
+    snap.forEach((doc) => listEl.appendChild(renderCard(doc.data())));
+  }
+
+  function renderCard(g) {
+    const card = document.createElement("div");
+    card.className = "game-card";
+    const videoHtml = g.videoUrl
+      ? `<video src="${g.videoUrl}" controls></video>`
+      : `<div class="placeholder">No video uploaded yet</div>`;
+    card.innerHTML = `
+      <div class="card-head"><span>WEEK ${g.week}</span><span>FINAL</span></div>
+      <div class="card-body">
+        <div class="score-row">
+          <div class="side winner">
+            <div class="tag-line">Winner</div>
+            <div class="name">${g.winnerName}</div>
+            <div class="score">${Number(g.winnerScore).toFixed(1)}</div>
+          </div>
+          <div class="mid-vs">VS</div>
+          <div class="side loser">
+            <div class="tag-line">Loser</div>
+            <div class="name">${g.loserName}</div>
+            <div class="score">${Number(g.loserScore).toFixed(1)}</div>
+          </div>
+        </div>
+        <div class="odds-line">CLOSING SPREAD: ${g.closingSpread || "\u2014"} &nbsp;\u00b7&nbsp; O/U ${g.overUnder || "\u2014"}</div>
+        <div class="punishment-block">
+          <div class="video-slot">${videoHtml}</div>
+          <div class="punishment-text">
+            <div class="lbl">Punishment</div>
+            <div class="txt">${g.punishmentText || "\u2014"}</div>
+          </div>
+        </div>
+      </div>`;
+    return card;
+  }
+
+  loadHistory();
+</script>
+</body>
+</html>
