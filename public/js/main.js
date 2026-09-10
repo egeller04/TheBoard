@@ -32,14 +32,14 @@ function renderMatchup(data) {
   if (a) {
     document.getElementById("teamAName").textContent = a.name;
     document.getElementById("teamARecord").textContent =
-      `${a.record?.wins ?? 0}\u2013${a.record?.losses ?? 0}`;
+      `${a.record?.wins ?? 0}–${a.record?.losses ?? 0}`;
     document.getElementById("teamAScore").textContent = a.score?.toFixed(1) ?? "0.0";
     document.getElementById("teamAPlayoff").textContent = `${a.roughPlayoffPct}%`;
   }
   if (b) {
     document.getElementById("teamBName").textContent = b.name;
     document.getElementById("teamBRecord").textContent =
-      `${b.record?.wins ?? 0}\u2013${b.record?.losses ?? 0}`;
+      `${b.record?.wins ?? 0}–${b.record?.losses ?? 0}`;
     document.getElementById("teamBScore").textContent = b.score?.toFixed(1) ?? "0.0";
     document.getElementById("teamBPlayoff").textContent = `${b.roughPlayoffPct}%`;
   }
@@ -56,6 +56,9 @@ function renderMatchup(data) {
     document.getElementById("pfBarB").style.width = `${b.roughPlayoffPct}%`;
   }
 
+  console.log("ROSTER A DATA:", data.rosterA);
+  console.log("ROSTER B DATA:", data.rosterB);
+
   renderRoster("rosterA", data.rosterA);
   renderRoster("rosterB", data.rosterB);
 }
@@ -63,14 +66,17 @@ function renderMatchup(data) {
 function renderRoster(tableId, players) {
   const tbody = document.getElementById(tableId);
   tbody.innerHTML = "";
+
   (players || []).forEach((p) => {
-    const dotClass = p.status === "Playing" ? "playing" : p.status === "Bye" ? "bye" : "final";
     const row = document.createElement("tr");
+
     row.innerHTML = `
       <td>${p.name}</td>
-      <td><span class="status-dot ${dotClass}"></span>${p.status}</td>
-      <td class="mins">${p.left || "\u2014"}</td>
-      <td class="pts">${p.points.toFixed(1)}</td>`;
+      <td>${p.position || "—"}</td>
+      <td class="mins">${p.left || "—"}</td>
+      <td class="pts">${p.points.toFixed(1)}</td>
+    `;
+
     tbody.appendChild(row);
   });
 }
@@ -112,19 +118,19 @@ async function loadPunishmentLabels() {
   punishmentList = snap.docs.map((d) => d.data().text);
   buildWheel(punishmentList);
 }
-
+ 
 function buildWheel(labels) {
   const svgNS = "http://www.w3.org/2000/svg";
   const wheel = document.getElementById("wheel");
   wheel.innerHTML = "";
   const cx = 150, cy = 150, r = 145, n = Math.max(labels.length, 1);
   const colors = ["#1D5CD1", "#E8A93B"];
-
+ 
   // Fewer wedges = more angular room per wedge = can fit bigger text/wider lines.
   const fontSize = n <= 5 ? 10 : n <= 8 ? 8.5 : n <= 12 ? 7 : 6;
   const maxCharsPerLine = n <= 5 ? 18 : n <= 8 ? 14 : n <= 12 ? 11 : 9;
   const maxLines = n <= 8 ? 4 : 5;
-
+ 
   labels.forEach((label, i) => {
     const color = colors[i % 2];
     const a0 = (i / n) * 2 * Math.PI - Math.PI / 2;
@@ -137,12 +143,12 @@ function buildWheel(labels) {
     path.setAttribute("stroke", "#fff");
     path.setAttribute("stroke-width", "2");
     wheel.appendChild(path);
-
+ 
     const lines = wrapLabel(label, maxCharsPerLine, maxLines);
     const mid = (a0 + a1) / 2;
     const lx = cx + r * 0.64 * Math.cos(mid), ly = cy + r * 0.64 * Math.sin(mid);
     const rotateDeg = (mid * 180) / Math.PI + 90;
-
+ 
     const text = document.createElementNS(svgNS, "text");
     text.setAttribute("x", lx);
     text.setAttribute("y", ly);
@@ -151,7 +157,7 @@ function buildWheel(labels) {
     text.setAttribute("font-family", "Space Mono, monospace");
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("transform", `rotate(${rotateDeg}, ${lx}, ${ly})`);
-
+ 
     const lineHeight = fontSize + 1.5;
     const startDy = -((lines.length - 1) * lineHeight) / 2;
     lines.forEach((line, li) => {
@@ -164,7 +170,7 @@ function buildWheel(labels) {
     wheel.appendChild(text);
   });
 }
-
+ 
 // Greedily wraps a label onto multiple lines that fit within the wedge,
 // truncating with an ellipsis only in the rare case it still overflows
 // the max number of lines for this wheel size.
@@ -190,7 +196,7 @@ function wrapLabel(label, maxChars, maxLines) {
   }
   return lines;
 }
-
+ 
 function spinWheelToIndex(index, total) {
   const segAngle = 360 / total;
   const targetAngle = 360 * 6 - index * segAngle - segAngle / 2;
@@ -239,7 +245,7 @@ document.getElementById("uploadBtn")?.addEventListener("click", async () => {
   const status = document.getElementById("uploadStatus");
   if (!file) { status.textContent = "Choose a video file first."; return; }
 
-  status.textContent = "Uploading\u2026";
+  status.textContent = "Uploading…";
   try {
     const { data } = await getUploadUrlFn({
       password: window.__spinPassword,
@@ -247,7 +253,7 @@ document.getElementById("uploadBtn")?.addEventListener("click", async () => {
       contentType: file.type
     });
     await fetch(data.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-    status.textContent = "Uploaded! You're off the hook \u2014 for this week.";
+    status.textContent = "Uploaded! You're off the hook — for this week.";
   } catch (err) {
     status.textContent = "Upload failed: " + (err.message || "");
   }
