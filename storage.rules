@@ -1,0 +1,13 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /punishment-videos/{allPaths=**} {
+      allow read: if true;
+      // Uploads happen via a signed URL issued by the getUploadUrl
+      // Cloud Function (after it checks the weekly password server-side),
+      // which bypasses these rules entirely — so direct client writes
+      // through the SDK are blocked here.
+      allow write: if false;
+    }
+  }
+}

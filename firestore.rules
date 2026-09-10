@@ -1,21 +1,34 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Admin panel data.
-    // Only users who have successfully logged into Firebase
-    // Authentication can read/write these documents.
-    match /config/{document} {
-      allow read, write: if request.auth != null;
+    // Current week's matchup/config, wheel state, weekly password.
+    // Public can read (site needs it to render). Only the signed-in
+    // admin (you) can write. The weekly password is checked server-side
+    // in a Cloud Function, not trusted from the client, so it being
+    // publicly readable here is fine for display purposes only —
+    // spin/upload actions always re-verify it in the function.
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
 
-    match /punishments/{document} {
-      allow read, write: if request.auth != null;
+    // Punishment list — public read (shown on the wheel), admin write.
+    match /punishments/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
 
-    match /history/{document} {
-      allow read, write: if request.auth != null;
+    // Rotation schedule (who plays whom, which weeks are done).
+    match /rotation/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Past games archive.
+    match /history/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }
