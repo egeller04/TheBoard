@@ -120,6 +120,17 @@
   .upload-section button{width:100%; background:var(--navy); color:#fff; border:none; padding:10px; border-radius:6px; font-family:'Space Mono',monospace; font-size:12px; cursor:pointer;}
   .upload-status{font-size:11px; color:var(--steel); margin-top:8px; font-family:'Space Mono',monospace;}
 
+  .beer-btn{background:var(--panel); border:1px solid var(--blue-dim); color:var(--navy); font-family:'Space Mono',monospace; font-size:13px; padding:6px 12px; border-radius:20px; cursor:pointer; margin-top:4px;}
+  .beer-btn:hover{background:var(--blue); color:#fff; border-color:var(--blue);}
+  .beer-btn:active{transform:scale(0.95);}
+
+  .beer-bg{position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;}
+  .beer-emoji{position:absolute; opacity:.8; animation:beerFloat 5s ease-in-out infinite; user-select:none;}
+  @keyframes beerFloat{
+    0%,100%{ transform:translateY(0) rotate(0deg); }
+    50%{ transform:translateY(-14px) rotate(8deg); }
+  }
+
   footer{text-align:center; padding:36px; color:var(--steel); font-size:12px; font-family:'Space Mono',monospace;}
 
   @media (max-width:760px){
@@ -131,6 +142,8 @@
 </style>
 </head>
 <body>
+
+<div id="beerBackground" class="beer-bg"></div>
 
 <nav>
   <div class="brand"><span class="display">THE BOARD</span><span class="tag">// GAME OF THE WEEK</span></div>
@@ -154,7 +167,10 @@
           <div class="record" id="teamARecord">—</div>
           <div class="score" id="teamAScore">0.0</div>
         </div>
-        <div class="vs-col"><div class="vs">VS</div>—</div>
+        <div class="vs-col">
+          <div class="vs">VS</div>
+          <button id="beerBtn" class="beer-btn" title="Add a beer to the tally">🍺 <span id="beerCount">0</span></button>
+        </div>
         <div class="team right">
           <div class="name" id="teamBName">—</div>
           <div class="record" id="teamBRecord">—</div>

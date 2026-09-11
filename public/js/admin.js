@@ -2,7 +2,7 @@ import { auth, db } from "./firebase-init.js";
 import { signInWithEmailAndPassword, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, Timestamp
+  doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, Timestamp, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, getDownloadURL }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
@@ -26,6 +26,27 @@ onAuthStateChanged(auth, (user) => {
   if (user) {
     loadWeekConfig();
     loadPunishments();
+    watchBeerCounterAdmin();
+  }
+});
+
+// ---- Beer counter override ----
+function watchBeerCounterAdmin() {
+  onSnapshot(doc(db, "stats", "beerCounter"), (snap) => {
+    const count = snap.exists() ? (snap.data().count || 0) : 0;
+    document.getElementById("beerCountText").textContent = `Current count: ${count}`;
+    document.getElementById("beerCountInput").value = count;
+  });
+}
+
+document.getElementById("saveBeerCountBtn").addEventListener("click", async () => {
+  const status = document.getElementById("beerCountStatus");
+  const newValue = Number(document.getElementById("beerCountInput").value);
+  try {
+    await setDoc(doc(db, "stats", "beerCounter"), { count: newValue }, { merge: true });
+    status.textContent = "Updated.";
+  } catch (err) {
+    status.textContent = "Error: " + err.message;
   }
 });
 

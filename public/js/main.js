@@ -1,5 +1,5 @@
 import { db, functions } from "./firebase-init.js";
-import { doc, getDoc, collection, getDocs, onSnapshot }
+import { doc, getDoc, collection, getDocs, onSnapshot, setDoc, increment }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { httpsCallable }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
@@ -11,6 +11,42 @@ const getUploadUrlFn = httpsCallable(functions, "getUploadUrl");
 
 let currentConfig = null;
 let punishmentList = [];
+
+// ---- Beer counter ----
+let renderedBeerCount = 0;
+const BEER_CAP = 300; // keep the DOM sane if the count gets huge
+
+function addBeerEmoji(container) {
+  const el = document.createElement("span");
+  el.className = "beer-emoji";
+  el.textContent = "🍺";
+  el.style.left = Math.random() * 96 + "vw";
+  el.style.top = Math.random() * 96 + "vh";
+  el.style.fontSize = (16 + Math.random() * 22) + "px";
+  el.style.animationDelay = (Math.random() * 4) + "s";
+  container.appendChild(el);
+}
+
+function syncBeerBackground(count) {
+  const container = document.getElementById("beerBackground");
+  const target = Math.min(count, BEER_CAP);
+  while (renderedBeerCount < target) {
+    addBeerEmoji(container);
+    renderedBeerCount++;
+  }
+}
+
+function watchBeerCounter() {
+  onSnapshot(doc(db, "stats", "beerCounter"), (snap) => {
+    const count = snap.exists() ? (snap.data().count || 0) : 0;
+    document.getElementById("beerCount").textContent = count;
+    syncBeerBackground(count);
+  });
+}
+
+document.getElementById("beerBtn").addEventListener("click", () => {
+  setDoc(doc(db, "stats", "beerCounter"), { count: increment(1) }, { merge: true });
+});
 
 // ---- Load live matchup + rosters ----
 async function loadMatchup() {
@@ -293,3 +329,4 @@ loadMatchup();
 watchConfig();
 loadPunishmentLabels();
 setInterval(loadMatchup, 30000);
+watchBeerCounter();
