@@ -139,8 +139,17 @@ function buildRoster(leagueData, teamId, week, gameClocks) {
 
   return {
     players,
-    total: side?.totalPoints ?? 0
+    total: players.reduce((sum, p) => sum + (p.points || 0), 0)
   };
+}
+
+// Rough live win-probability estimate from each team's current total,
+// using a logistic curve. Not a real sportsbook line — a stand-in
+// until/unless we wire up an actual odds source.
+function estimateWinProbability(scoreA, scoreB) {
+  const diff = scoreA - scoreB;
+  const pctA = 1 / (1 + Math.pow(10, -diff / 15));
+  return { a: Math.round(pctA * 100), b: Math.round((1 - pctA) * 100) };
 }
 
 // Callable from the front end — returns the current Game of the Week's
@@ -186,6 +195,8 @@ exports.getMatchup = onCall(
       gameClocks
     );
 
+    const winProb = estimateWinProbability(rosterA.total, rosterB.total);
+
     // NOTE: ESPN doesn't expose their internal playoff-simulation
     // percentages through this API. This is a placeholder based on
     // record only, until we build a real projection.
@@ -205,14 +216,16 @@ exports.getMatchup = onCall(
         logo: teamA.logo,
         record: teamA.record?.overall,
         score: rosterA.total,
-        roughPlayoffPct: roughPlayoffOdds(teamA)
+        roughPlayoffPct: roughPlayoffOdds(teamA),
+        winProbPct: winProb.a
       },
       teamB: teamB && {
         name: teamB.name,
         logo: teamB.logo,
         record: teamB.record?.overall,
         score: rosterB.total,
-        roughPlayoffPct: roughPlayoffOdds(teamB)
+        roughPlayoffPct: roughPlayoffOdds(teamB),
+        winProbPct: winProb.b
       },
       rosterA: rosterA.players,
       rosterB: rosterB.players

@@ -48,6 +48,14 @@ function renderMatchup(data) {
   document.getElementById(leadingKey).classList.add("leading");
 
   if (a) {
+    document.getElementById("winProbALabel").textContent = `${a.name} ${a.winProbPct}%`;
+    document.getElementById("winProbFillA").style.width = `${a.winProbPct}%`;
+  }
+  if (b) {
+    document.getElementById("winProbBLabel").textContent = `${b.winProbPct}% ${b.name}`;
+  }
+
+  if (a) {
     document.getElementById("pfNameA").textContent = a.name;
     document.getElementById("pfBarA").style.width = `${a.roughPlayoffPct}%`;
   }
@@ -67,7 +75,21 @@ function renderRoster(tableId, players) {
   const tbody = document.getElementById(tableId);
   tbody.innerHTML = "";
 
-  (players || []).forEach((p) => {
+  const positionOrder = {
+    "QB": 1,
+    "RB": 2,
+    "WR": 3,
+    "TE": 4,
+    "FLEX": 5,
+    "K": 6,
+    "D/ST": 7
+  };
+
+  const sortedPlayers = [...(players || [])].sort(
+    (a, b) => positionOrder[a.position] - positionOrder[b.position]
+  );
+
+  sortedPlayers.forEach((p) => {
     const row = document.createElement("tr");
 
     row.innerHTML = `
@@ -80,6 +102,7 @@ function renderRoster(tableId, players) {
     tbody.appendChild(row);
   });
 }
+
 
 // ---- Config (week number, reveal time, wheel lock state) ----
 function watchConfig() {

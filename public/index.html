@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Board — Game of the Week</title>
+<title>The Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -47,6 +47,12 @@
   .team-logo {width: 64px; height: 64px; object-fit: contain; flex-shrink: 0;}
   .vs-col{display:flex; flex-direction:column; align-items:center; gap:4px;}
   .vs-col .vs{font-family:'Space Mono',monospace; color:var(--steel); font-size:12px;}
+
+  .winprob-section{padding:0 30px 22px;}
+  .winprob-labels{display:flex; justify-content:space-between; align-items:baseline; font-family:'Space Mono',monospace; font-size:12px; color:var(--navy); font-weight:700; margin-bottom:6px;}
+  .winprob-caption{font-size:10px; color:var(--steel); font-weight:400; text-transform:uppercase; letter-spacing:.05em;}
+  .winprob-track{height:10px; border-radius:20px; background:var(--gold); overflow:hidden; position:relative;}
+  .winprob-fill-a{height:100%; background:var(--blue); border-radius:20px 0 0 20px;}
 
   .stat-strip{display:grid; grid-template-columns:repeat(2,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
   .stat-strip div{padding:16px; text-align:center; border-right:1px solid var(--line);}
@@ -153,6 +159,17 @@
           <div class="name" id="teamBName">—</div>
           <div class="record" id="teamBRecord">—</div>
           <div class="score" id="teamBScore">0.0</div>
+        </div>
+      </div>
+
+      <div class="winprob-section">
+        <div class="winprob-labels">
+          <span id="winProbALabel">— --%</span>
+          <span class="winprob-caption">Win Probability (live estimate)</span>
+          <span id="winProbBLabel">--% —</span>
+        </div>
+        <div class="winprob-track">
+          <div class="winprob-fill-a" id="winProbFillA" style="width:50%"></div>
         </div>
       </div>
 
