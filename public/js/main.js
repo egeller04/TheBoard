@@ -12,40 +12,41 @@ const getUploadUrlFn = httpsCallable(functions, "getUploadUrl");
 let currentConfig = null;
 let punishmentList = [];
 
-// ---- Beer counter ----
-let renderedBeerCount = 0;
-const BEER_CAP = 300; // keep the DOM sane if the count gets huge
-
-function addBeerEmoji(container) {
-  const el = document.createElement("span");
-  el.className = "beer-emoji";
-  el.textContent = "🍺";
-  el.style.left = Math.random() * 96 + "vw";
-  el.style.top = Math.random() * 96 + "vh";
-  el.style.fontSize = (16 + Math.random() * 22) + "px";
-  el.style.animationDelay = (Math.random() * 4) + "s";
-  container.appendChild(el);
-}
-
-function syncBeerBackground(count) {
-  const container = document.getElementById("beerBackground");
-  const target = Math.min(count, BEER_CAP);
-  while (renderedBeerCount < target) {
-    addBeerEmoji(container);
-    renderedBeerCount++;
-  }
-}
+// ---- Beer tracker: fl oz × ABV%, shown as standard-beer equivalents ----
+// 1 standard beer = 12oz at 5% ABV = 0.6 fl oz of pure alcohol.
+const STANDARD_BEER_ALCOHOL_OZ = 0.6;
 
 function watchBeerCounter() {
   onSnapshot(doc(db, "stats", "beerCounter"), (snap) => {
-    const count = snap.exists() ? (snap.data().count || 0) : 0;
-    document.getElementById("beerCount").textContent = count;
-    syncBeerBackground(count);
+    if (!snap.exists()) return;
+
+    const count = Number(snap.data().count || 0);
+
+    document.getElementById("beerCount").textContent =
+      Math.round(count);
   });
 }
 
-document.getElementById("beerBtn").addEventListener("click", () => {
-  setDoc(doc(db, "stats", "beerCounter"), { count: increment(1) }, { merge: true });
+document.getElementById("addBeerBtn").addEventListener("click", async () => {
+  const oz = parseFloat(document.getElementById("beerOz").value);
+  const pct = parseFloat(document.getElementById("beerPct").value);
+
+  if (!oz || !pct) return;
+
+  const alcoholOz = oz * (pct / 100);
+  const standardBeers = alcoholOz / STANDARD_BEER_ALCOHOL_OZ;
+
+  await setDoc(
+    doc(db, "stats", "beerCounter"),
+    {
+      count: increment(standardBeers),
+      totalAlcoholOz: increment(alcoholOz)
+    },
+    { merge: true }
+  );
+
+  document.getElementById("beerOz").value = "";
+  document.getElementById("beerPct").value = "";
 });
 
 // ---- Load live matchup + rosters ----
@@ -83,13 +84,14 @@ function renderMatchup(data) {
   const leadingKey = (a?.score ?? 0) >= (b?.score ?? 0) ? "teamAScore" : "teamBScore";
   document.getElementById(leadingKey).classList.add("leading");
 
-  if (a) {
-    document.getElementById("winProbALabel").textContent = `${a.name} ${a.winProbPct}%`;
-    document.getElementById("winProbFillA").style.width = `${a.winProbPct}%`;
-  }
-  if (b) {
-    document.getElementById("winProbBLabel").textContent = `${b.winProbPct}% ${b.name}`;
-  }
+  // if (data.spread) {
+  //   document.getElementById("spreadVal").textContent = data.spread.favorite
+  //     ? `${data.spread.favorite} -${data.spread.amount.toFixed(1)}`
+  //     : "PICK 'EM";
+  // }
+  // if (data.overUnder != null) {
+  //   document.getElementById("ouVal").textContent = data.overUnder.toFixed(1);
+  // }
 
   if (a) {
     document.getElementById("pfNameA").textContent = a.name;

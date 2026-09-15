@@ -48,12 +48,6 @@
   .vs-col{display:flex; flex-direction:column; align-items:center; gap:4px;}
   .vs-col .vs{font-family:'Space Mono',monospace; color:var(--steel); font-size:12px;}
 
-  .winprob-section{padding:0 30px 22px;}
-  .winprob-labels{display:flex; justify-content:space-between; align-items:baseline; font-family:'Space Mono',monospace; font-size:12px; color:var(--navy); font-weight:700; margin-bottom:6px;}
-  .winprob-caption{font-size:10px; color:var(--steel); font-weight:400; text-transform:uppercase; letter-spacing:.05em;}
-  .winprob-track{height:10px; border-radius:20px; background:var(--gold); overflow:hidden; position:relative;}
-  .winprob-fill-a{height:100%; background:var(--blue); border-radius:20px 0 0 20px;}
-
   .stat-strip{display:grid; grid-template-columns:repeat(2,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
   .stat-strip div{padding:16px; text-align:center; border-right:1px solid var(--line);}
   .stat-strip div:last-child{border-right:none;}
@@ -120,17 +114,12 @@
   .upload-section button{width:100%; background:var(--navy); color:#fff; border:none; padding:10px; border-radius:6px; font-family:'Space Mono',monospace; font-size:12px; cursor:pointer;}
   .upload-status{font-size:11px; color:var(--steel); margin-top:8px; font-family:'Space Mono',monospace;}
 
-  .beer-btn{background:var(--panel); border:1px solid var(--blue-dim); color:var(--navy); font-family:'Space Mono',monospace; font-size:13px; padding:6px 12px; border-radius:20px; cursor:pointer; margin-top:4px;}
-  .beer-btn:hover{background:var(--blue); color:#fff; border-color:var(--blue);}
-  .beer-btn:active{transform:scale(0.95);}
-
-  .beer-bg{position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;}
-  .beer-emoji{position:absolute; opacity:.8; animation:beerFloat 5s ease-in-out infinite; user-select:none;}
-  @keyframes beerFloat{
-    0%,100%{ transform:translateY(0) rotate(0deg); }
-    50%{ transform:translateY(-14px) rotate(8deg); }
-  }
-
+  .beer-tracker{display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:4px;}
+  .beer-total{font-family:'Space Mono',monospace; font-size:15px; color:var(--navy); font-weight:700;}
+  .beer-inputs{display:flex; gap:4px; align-items:center;}
+  .beer-inputs input{width:48px; padding:5px 6px; font-size:11px; border:1px solid var(--blue-dim); border-radius:4px; font-family:'Space Mono',monospace; background:var(--panel); color:var(--navy);}
+  .beer-inputs button{background:var(--blue); color:#fff; border:none; width:24px; height:24px; border-radius:50%; cursor:pointer; font-size:14px; line-height:1;}
+  .beer-inputs button:hover{background:var(--navy);}
   footer{text-align:center; padding:36px; color:var(--steel); font-size:12px; font-family:'Space Mono',monospace;}
 
   @media (max-width:760px){
@@ -142,8 +131,6 @@
 </style>
 </head>
 <body>
-
-<div id="beerBackground" class="beer-bg"></div>
 
 <nav>
   <div class="brand"><span class="display">THE BOARD</span><span class="tag">// GAME OF THE WEEK</span></div>
@@ -169,7 +156,14 @@
         </div>
         <div class="vs-col">
           <div class="vs">VS</div>
-          <button id="beerBtn" class="beer-btn" title="Add a beer to the tally">🍺 <span id="beerCount">0</span></button>
+          <div class="beer-tracker">
+            <div class="beer-total">🍺 <span id="beerCount">0.0</span></div>
+            <div class="beer-inputs">
+              <input type="number" id="beerOz" placeholder="oz" step="0.1" min="0">
+              <input type="number" id="beerPct" placeholder="%" step="0.1" min="0">
+              <button id="addBeerBtn">+</button>
+            </div>
+          </div>
         </div>
         <div class="team right">
           <div class="name" id="teamBName">—</div>
@@ -178,16 +172,16 @@
         </div>
       </div>
 
-      <div class="winprob-section">
-        <div class="winprob-labels">
-          <span id="winProbALabel">— --%</span>
-          <span class="winprob-caption">Win Probability (live estimate)</span>
-          <span id="winProbBLabel">--% —</span>
+      <!-- <div class="stat-strip">
+        <div>
+          <div class="lbl">Spread</div>
+          <div class="val" id="spreadVal">—</div>
         </div>
-        <div class="winprob-track">
-          <div class="winprob-fill-a" id="winProbFillA" style="width:50%"></div>
+        <div>
+          <div class="lbl">O/U</div>
+          <div class="val" id="ouVal">—</div>
         </div>
-      </div>
+      </div> -->
 
       <div class="playoff-section">
         <div class="lbl">Playoff Odds</div>

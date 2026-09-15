@@ -31,21 +31,72 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ---- Beer counter override ----
+// ---- Beer counter override ----
+const STANDARD_BEER_ALCOHOL_OZ = 0.6;
+
 function watchBeerCounterAdmin() {
   onSnapshot(doc(db, "stats", "beerCounter"), (snap) => {
-    const count = snap.exists() ? (snap.data().count || 0) : 0;
-    document.getElementById("beerCountText").textContent = `Current count: ${count}`;
-    document.getElementById("beerCountInput").value = count;
+    if (!snap.exists()) {
+      document.getElementById("beerCountText").textContent =
+        "Current total: 0 beers";
+      document.getElementById("beerCountInput").value = 0;
+      return;
+    }
+
+    const data = snap.data();
+
+    // Use totalAlcoholOz as the source of truth for what is displayed
+    const totalAlcoholOz = Number(data.totalAlcoholOz || 0);
+    const standardBeers = totalAlcoholOz / STANDARD_BEER_ALCOHOL_OZ;
+
+    document.getElementById("beerCountText").textContent =
+      `Current total: ${Math.round(standardBeers)} beers`;
+
+    document.getElementById("beerCountInput").value =
+      Math.round(standardBeers);
   });
 }
 
 document.getElementById("saveBeerCountBtn").addEventListener("click", async () => {
   const status = document.getElementById("beerCountStatus");
-  const newValue = Number(document.getElementById("beerCountInput").value);
+
+  const newBeers = Number(
+    document.getElementById("beerCountInput").value
+  );
+
+  if (!Number.isInteger(newBeers) || newBeers < 0) {
+    status.textContent = "Enter a whole number.";
+    return;
+  }
+
+  const totalAlcoholOz = newBeers * STANDARD_BEER_ALCOHOL_OZ;
+
+  console.log("ADMIN BEER UPDATE");
+  console.log("count:", newBeers);
+  console.log("totalAlcoholOz:", totalAlcoholOz);
+
   try {
-    await setDoc(doc(db, "stats", "beerCounter"), { count: newValue }, { merge: true });
-    status.textContent = "Updated.";
+    const beerRef = doc(db, "stats", "beerCounter");
+
+    await setDoc(
+      beerRef,
+      {
+        count: newBeers,
+        totalAlcoholOz: totalAlcoholOz
+      },
+      { merge: true }
+    );
+
+    // Immediately read it back from Firestore
+    const verifySnap = await getDoc(beerRef);
+
+    console.log("FIRESTORE AFTER SAVE:", verifySnap.data());
+
+    status.textContent =
+      `Updated to ${newBeers} beers (${totalAlcoholOz.toFixed(1)} oz alcohol).`;
+
   } catch (err) {
+    console.error("Beer counter update failed:", err);
     status.textContent = "Error: " + err.message;
   }
 });

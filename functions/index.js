@@ -66,18 +66,38 @@ async function fetchNflScoreboard() {
 
 function buildGameClockMap(nflData) {
   const map = {};
+
   for (const event of nflData.events || []) {
     const comp = event.competitions?.[0];
     const status = comp?.status;
+
     for (const c of comp?.competitors || []) {
+      const state = status?.type?.state;
+
       map[c.team.abbreviation] = {
-        state: status?.type?.state, // "pre" | "in" | "post"
-        clock: status?.displayClock,
-        period: status?.period
+        state: state,
+        clock: state === "post"
+          ? "FINAL"
+          : status?.displayClock,
+        period: status?.period,
+        startTime: event.date
       };
     }
   }
+
   return map;
+}
+
+function formatGameTime(dateString) {
+  if (!dateString) return null;
+
+  const date = new Date(dateString);
+
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York"
+  });
 }
 
 function buildRoster(leagueData, teamId, week, gameClocks) {
@@ -125,8 +145,12 @@ function buildRoster(leagueData, teamId, week, gameClocks) {
 
     let left = null;
 
-    if (game?.state === "in") {
+    if (game?.state === "post") {
+      left = "FINAL";
+    } else if (game?.state === "in") {
       left = `Q${game.period} ${game.clock}`;
+    } else if (game?.state === "pre") {
+      left = formatGameTime(game.startTime);
     }
 
     return {
@@ -141,15 +165,6 @@ function buildRoster(leagueData, teamId, week, gameClocks) {
     players,
     total: players.reduce((sum, p) => sum + (p.points || 0), 0)
   };
-}
-
-// Rough live win-probability estimate from each team's current total,
-// using a logistic curve. Not a real sportsbook line — a stand-in
-// until/unless we wire up an actual odds source.
-function estimateWinProbability(scoreA, scoreB) {
-  const diff = scoreA - scoreB;
-  const pctA = 1 / (1 + Math.pow(10, -diff / 15));
-  return { a: Math.round(pctA * 100), b: Math.round((1 - pctA) * 100) };
 }
 
 // Callable from the front end — returns the current Game of the Week's
@@ -195,7 +210,12 @@ exports.getMatchup = onCall(
       gameClocks
     );
 
-    const winProb = estimateWinProbability(rosterA.total, rosterB.total);
+    // const projDiff = rosterA.projectedTotal - rosterB.projectedTotal;
+    // const overUnder = rosterA.projectedTotal + rosterB.projectedTotal;
+    // const spread = {
+    //   favorite: Math.abs(projDiff) < 0.05 ? null : (projDiff > 0 ? teamA?.name : teamB?.name),
+    //   amount: Math.abs(projDiff)
+    // };
 
     // NOTE: ESPN doesn't expose their internal playoff-simulation
     // percentages through this API. This is a placeholder based on
@@ -211,21 +231,21 @@ exports.getMatchup = onCall(
 
     return {
       week: config.week,
+      // spread,
+      // overUnder,
       teamA: teamA && {
         name: teamA.name,
         logo: teamA.logo,
         record: teamA.record?.overall,
         score: rosterA.total,
-        roughPlayoffPct: roughPlayoffOdds(teamA),
-        winProbPct: winProb.a
+        roughPlayoffPct: roughPlayoffOdds(teamA)
       },
       teamB: teamB && {
         name: teamB.name,
         logo: teamB.logo,
         record: teamB.record?.overall,
         score: rosterB.total,
-        roughPlayoffPct: roughPlayoffOdds(teamB),
-        winProbPct: winProb.b
+        roughPlayoffPct: roughPlayoffOdds(teamB)
       },
       rosterA: rosterA.players,
       rosterB: rosterB.players
