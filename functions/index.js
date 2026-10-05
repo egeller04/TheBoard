@@ -109,36 +109,18 @@ function buildRoster(leagueData, teamId, week, gameClocks) {
 
   if (!matchup) return { players: [], total: 0 };
 
-  const side =
-    matchup.home?.teamId === teamId ? matchup.home : matchup.away;
-
   const team = (leagueData.teams || []).find(
     (t) => t.id === teamId
   );
 
-  const STARTER_SLOTS = {
-    0: "QB",
-    2: "RB",
-    4: "WR",
-    6: "TE",
-    16: "D/ST",
-    17: "K",
-    23: "FLEX"
-  };
 
   const entries = (team?.roster?.entries || []).filter(
     (entry) => STARTER_SLOTS[entry.lineupSlotId]
   );
 
   const players = entries.map((entry) => {
-    const p = entry.playerPoolEntry.player;
+    const p = entry.playerPoolEntry?.player || {};
 
-    console.log("POSITION DEBUG:", {
-      player: p.fullName,
-      lineupSlotId: entry.lineupSlotId,
-      type: typeof entry.lineupSlotId,
-      mappedPosition: STARTER_SLOTS[entry.lineupSlotId]
-    });
 
     const abbr = PRO_TEAM_MAP[p.proTeamId] || null;
     const game = abbr ? gameClocks[abbr] : null;
@@ -153,11 +135,15 @@ function buildRoster(leagueData, teamId, week, gameClocks) {
       left = formatGameTime(game.startTime);
     }
 
+    const weekStats = (p.stats || []).find(
+      (s) => s.scoringPeriodId === week && s.statSourceId === 0
+    );
+
     return {
-      name: p.fullName,
+      name: p.fullName || "Unknown player",
       position: STARTER_SLOTS[entry.lineupSlotId],
       left,
-      points: entry.playerPoolEntry.appliedStatTotal ?? 0
+      points: weekStats?.appliedTotal ?? 0
     };
   });
 
@@ -168,10 +154,11 @@ function buildRoster(leagueData, teamId, week, gameClocks) {
 }
 
 // Callable from the front end — returns the current Game of the Week's
-// live scores, rosters, and status. No auth required (public page).
+// live scores, rosters, and status for invited members.
 exports.getMatchup = onCall(
   { secrets: [ESPN_S2, ESPN_SWID] },
-  async () => {
+  async (request) => {
+    await requireMember(request);
     const configSnap = await db.collection("config").doc("current").get();
     if (!configSnap.exists) {
       throw new HttpsError("not-found", "No current matchup is configured yet.");
@@ -185,13 +172,6 @@ exports.getMatchup = onCall(
     const gameClocks = buildGameClockMap(nflData);
 
     const teams = leagueData.teams || [];
-
-    console.log("TEAM IMAGE DEBUG:", teams.map(t => ({
-      id: t.id,
-      name: t.name,
-      logo: t.logo,
-      managers: t.managers
-    })));
 
     const teamA = teams.find((t) => t.id === config.teamAId);
     const teamB = teams.find((t) => t.id === config.teamBId);
@@ -210,13 +190,6 @@ exports.getMatchup = onCall(
       gameClocks
     );
 
-    // const projDiff = rosterA.projectedTotal - rosterB.projectedTotal;
-    // const overUnder = rosterA.projectedTotal + rosterB.projectedTotal;
-    // const spread = {
-    //   favorite: Math.abs(projDiff) < 0.05 ? null : (projDiff > 0 ? teamA?.name : teamB?.name),
-    //   amount: Math.abs(projDiff)
-    // };
-
     // NOTE: ESPN doesn't expose their internal playoff-simulation
     // percentages through this API. This is a placeholder based on
     // record only, until we build a real projection.
@@ -231,8 +204,6 @@ exports.getMatchup = onCall(
 
     return {
       week: config.week,
-      // spread,
-      // overUnder,
       teamA: teamA && {
         name: teamA.name,
         logo: teamA.logo,
@@ -253,18 +224,13 @@ exports.getMatchup = onCall(
   }
 );
 
-// Verifies the weekly password without revealing it, and without letting
-// the client see whether the wheel is already locked from a prior guess.
+// Verify the private weekly password for spinning or uploading after a reload.
 exports.verifyWeeklyPassword = onCall(async (request) => {
+  await requireMember(request);
   const { password } = request.data || {};
   const configSnap = await db.collection("config").doc("current").get();
   if (!configSnap.exists) throw new HttpsError("not-found", "No active week.");
-  const config = configSnap.data();
-
-  if (config.spinLocked) {
-    throw new HttpsError("failed-precondition", "This week's wheel has already been spun.");
-  }
-  if (!password || password !== config.weeklyPassword) {
+  if (!password || password !== (await db.collection("config").doc("private").get()).data()?.weeklyPassword) {
     throw new HttpsError("permission-denied", "Incorrect password.");
   }
   return { ok: true };
@@ -273,6 +239,7 @@ exports.verifyWeeklyPassword = onCall(async (request) => {
 // Spins the wheel server-side (so the outcome can't be manipulated from
 // the browser) and locks the result in Firestore.
 exports.spinWheel = onCall(async (request) => {
+  await requireMember(request);
   const { password } = request.data || {};
   const configRef = db.collection("config").doc("current");
 
@@ -284,11 +251,12 @@ exports.spinWheel = onCall(async (request) => {
     if (config.spinLocked) {
       throw new HttpsError("failed-precondition", "The wheel has already been spun this week.");
     }
-    if (!password || password !== config.weeklyPassword) {
+    const secret = await tx.get(db.collection("config").doc("private"));
+    if (!password || password !== secret.data()?.weeklyPassword) {
       throw new HttpsError("permission-denied", "Incorrect password.");
     }
 
-    const punishmentsSnap = await db.collection("punishments").get();
+    const punishmentsSnap = await tx.get(db.collection("punishments"));
     const punishments = punishmentsSnap.docs.map((d) => d.data().text);
     if (punishments.length === 0) {
       throw new HttpsError("failed-precondition", "No punishments have been added yet.");
@@ -308,10 +276,9 @@ exports.spinWheel = onCall(async (request) => {
   });
 });
 
-// Issues a short-lived signed URL so the loser can upload their
-// punishment video directly to Storage without needing a Firebase
-// Auth account of their own.
+// Issues a short-lived upload URL for an invited member with the weekly password.
 exports.getUploadUrl = onCall(async (request) => {
+  await requireMember(request);
   const { password, fileName, contentType } = request.data || {};
   const configSnap = await db.collection("config").doc("current").get();
   if (!configSnap.exists) throw new HttpsError("not-found", "No active week.");
@@ -320,10 +287,13 @@ exports.getUploadUrl = onCall(async (request) => {
   if (!config.spinLocked) {
     throw new HttpsError("failed-precondition", "Spin the wheel before uploading a video.");
   }
-  if (!password || password !== config.weeklyPassword) {
+  if (!password || password !== (await db.collection("config").doc("private").get()).data()?.weeklyPassword) {
     throw new HttpsError("permission-denied", "Incorrect password.");
   }
 
+  if (typeof fileName !== "string" || typeof contentType !== "string" || !/^video\/[a-zA-Z0-9.+-]+$/.test(contentType)) {
+    throw new HttpsError("invalid-argument", "Choose a video file.");
+  }
   const safeName = (fileName || "punishment.mp4").replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `punishment-videos/week-${config.week}-${Date.now()}-${safeName}`;
   const file = bucket.file(path);
@@ -340,4 +310,100 @@ exports.getUploadUrl = onCall(async (request) => {
   });
 
   return { uploadUrl: url, storagePath: path };
+});
+
+// Membership is checked server-side; an ordinary Firebase account grants no access.
+const { randomBytes, createHash, randomUUID } = require("node:crypto");
+const inviteHash = (token) => createHash("sha256").update(token).digest("hex");
+async function requireMember(request) {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Please log in.");
+  if (request.auth.token.admin === true) return;
+  const member = await db.collection("members").doc(request.auth.uid).get();
+  if (!member.exists) throw new HttpsError("permission-denied", "An invitation is required.");
+}
+exports.createInvitation = onCall(async (request) => {
+  if (request.auth?.token.admin !== true) throw new HttpsError("permission-denied", "Admin only.");
+  const cooldownSeconds = request.data?.cooldownSeconds ?? 60;
+  if (![60, 300, 3600].includes(cooldownSeconds)) {
+    throw new HttpsError("invalid-argument", "Choose a cooldown of 1 minute, 5 minutes, or 1 hour.");
+  }
+  const token = randomBytes(32).toString("base64url");
+  await db.collection("invitations").doc(inviteHash(token)).set({
+    expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 7 * 86400000),
+    reusable: true,
+    cooldownSeconds,
+    createdBy: request.auth.uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  return { token };
+});
+exports.registerWithInvitation = onCall(async (request) => {
+  const { token, email, password } = request.data || {};
+  if (typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token) ||
+      typeof email !== "string" || email.length > 254 ||
+      typeof password !== "string" || password.length < 12 || password.length > 128) {
+    throw new HttpsError("invalid-argument", "Use a valid invitation, email, and a password of 12–128 characters.");
+  }
+  const invitation = db.collection("invitations").doc(inviteHash(token));
+  const uid = randomUUID();
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(invitation);
+    const data = snap.data();
+    if (!data || (!data.reusable && data.usedBy) || data.expiresAt.toMillis() <= Date.now()) {
+      throw new HttpsError("permission-denied", "This invitation is invalid, expired, or already used.");
+    }
+    if (data.reservedBy) {
+      throw new HttpsError("resource-exhausted", "Someone is creating an account with this link. Please try again shortly.");
+    }
+    const retryAt = data.nextAvailableAt?.toMillis() || 0;
+    if (data.reusable && retryAt > Date.now()) {
+      const retryAfterSeconds = Math.ceil((retryAt - Date.now()) / 1000);
+      throw new HttpsError("resource-exhausted", `This link is cooling down. Try again in ${retryAfterSeconds} seconds.`, { retryAfterSeconds });
+    }
+    tx.update(invitation, { reservedBy: uid });
+  });
+  let created = false;
+  try {
+    await admin.auth().createUser({ uid, email: email.trim(), password });
+    created = true;
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(invitation);
+      if (snap.data()?.reservedBy !== uid) throw new Error("Invitation reservation lost");
+      tx.create(db.collection("members").doc(uid), {
+        joinedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      const data = snap.data();
+      tx.update(invitation, data.reusable ? {
+        reservedBy: admin.firestore.FieldValue.delete(),
+        nextAvailableAt: admin.firestore.Timestamp.fromMillis(Date.now() + data.cooldownSeconds * 1000),
+        signupCount: (data.signupCount || 0) + 1
+      } : { usedBy: uid, reservedBy: admin.firestore.FieldValue.delete() });
+    });
+    return { ok: true };
+  } catch (error) {
+    // Release only this request's reservation so invalid signup details can be corrected.
+    if (created) await admin.auth().deleteUser(uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(invitation);
+      if (snap.data()?.reservedBy === uid && !snap.data()?.usedBy) {
+        tx.update(invitation, { reservedBy: admin.firestore.FieldValue.delete() });
+      }
+    });
+    throw new HttpsError("failed-precondition", "Could not create account. Check your email or log in if you already have an account.");
+  }
+});
+
+
+// One transaction per tap prevents simultaneous members from losing increments.
+exports.addBeer = onCall(async (request) => {
+  await requireMember(request);
+  const counter = db.collection("stats").doc("beerCounter");
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(counter);
+    const previous = Number(snap.data()?.count) || 0;
+    const count = Math.max(0, Math.round(previous)) + 1;
+    if (!Number.isSafeInteger(count)) throw new HttpsError("out-of-range", "The counter is too large.");
+    tx.set(counter, { count });
+    return { count };
+  });
 });

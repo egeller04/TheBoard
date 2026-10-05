@@ -50,10 +50,19 @@
     <input type="password" id="loginPassword">
     <button id="loginSubmit">Log in</button>
     <div class="status-msg" id="loginStatus"></div>
-    <div class="hint">Create your account first in Firebase Console → Authentication → Add user.</div>
+    <div class="hint">Log in with your admin account.</div>
   </div>
 
   <div id="adminBody">
+    <div class="card">
+      <h2>Invite Your Group</h2>
+      <label for="inviteCooldown">Time between account creations</label>
+      <select id="inviteCooldown"><option value="60">1 minute</option><option value="300">5 minutes</option><option value="3600">1 hour</option></select>
+      <button id="createInviteBtn">Create shared invitation link</button>
+      <label for="inviteLink">Copy and send this link</label>
+      <input id="inviteLink" readonly onclick="this.select()">
+      <div class="status-msg" id="inviteStatus" role="status"></div>
+    </div>
     <div class="card">
       <h2>This Week's Game</h2>
       <label>Week number</label>
@@ -62,7 +71,7 @@
       <input type="number" id="teamAId">
       <label>Team B — ESPN Team ID</label>
       <input type="number" id="teamBId">
-      <div class="hint">Team IDs come from your ESPN league — I can help you look these up once the getMatchup function is deployed and we've confirmed it connects.</div>
+      <div class="hint">Use the numeric team IDs from your ESPN league.</div>
       <label>Weekly password (for the loser to spin)</label>
       <input type="text" id="weeklyPassword">
       <label>Reveal date/time for next matchup</label>
@@ -82,7 +91,7 @@
       <h2>Beer Counter</h2>
       <div id="beerCountText" class="hint">Loading…</div>
       <label>Set count to</label>
-      <input type="number" id="beerCountInput" min="0">
+      <input type="number" id="beerCountInput" min="0" step="1">
       <button class="secondary" id="saveBeerCountBtn">Update count</button>
       <div class="status-msg" id="beerCountStatus"></div>
     </div>

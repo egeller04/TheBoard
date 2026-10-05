@@ -1,14 +1,23 @@
 {
   "hosting": {
-  "site": "theboard-6f283",
-  "public": "public",
-  "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    "site": "theboard-6f283",
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
   },
   "functions": [
     {
       "source": "functions",
       "codebase": "default",
-      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log"
+      ]
     }
   ],
   "firestore": {
@@ -16,6 +25,6 @@
     "indexes": "firestore.indexes.json"
   },
   "storage": {
-    "rules": "firestore.rules"
+    "rules": "storage.rules"
   }
 }

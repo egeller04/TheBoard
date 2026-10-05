@@ -1,9 +1,13 @@
+import { requireLogin } from "./auth-guard.js";
 import { db, functions } from "./firebase-init.js";
-import { doc, getDoc, collection, getDocs, onSnapshot, setDoc, increment }
+import { doc, collection, getDocs, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { httpsCallable }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
+await requireLogin();
+
+const addBeer = httpsCallable(functions, "addBeer");
 const getMatchup = httpsCallable(functions, "getMatchup");
 const verifyWeeklyPassword = httpsCallable(functions, "verifyWeeklyPassword");
 const spinWheelFn = httpsCallable(functions, "spinWheel");
@@ -11,55 +15,38 @@ const getUploadUrlFn = httpsCallable(functions, "getUploadUrl");
 
 let currentConfig = null;
 let punishmentList = [];
+let countdownTimer;
+let spinPassword;
+let matchupLoading = false;
 
-// ---- Beer tracker: fl oz × ABV%, shown as standard-beer equivalents ----
-// 1 standard beer = 12oz at 5% ABV = 0.6 fl oz of pure alcohol.
-const STANDARD_BEER_ALCOHOL_OZ = 0.6;
-
+// Each tap adds exactly one beer; the server transaction handles concurrent taps.
 function watchBeerCounter() {
   onSnapshot(doc(db, "stats", "beerCounter"), (snap) => {
-    if (!snap.exists()) return;
-
-    const count = Number(snap.data().count || 0);
-
-    document.getElementById("beerCount").textContent =
-      Math.round(count);
-  });
+    document.getElementById("beerCount").textContent = Math.max(0, Math.round(Number(snap.data()?.count) || 0));
+  }, () => { document.getElementById("beerStatus").textContent = "Couldn't load the beer count."; });
 }
 
 document.getElementById("addBeerBtn").addEventListener("click", async () => {
-  const oz = parseFloat(document.getElementById("beerOz").value);
-  const pct = parseFloat(document.getElementById("beerPct").value);
-
-  if (!oz || !pct) return;
-
-  const alcoholOz = oz * (pct / 100);
-  const standardBeers = alcoholOz / STANDARD_BEER_ALCOHOL_OZ;
-
-  await setDoc(
-    doc(db, "stats", "beerCounter"),
-    {
-      count: increment(standardBeers),
-      totalAlcoholOz: increment(alcoholOz)
-    },
-    { merge: true }
-  );
-
-  document.getElementById("beerOz").value = "";
-  document.getElementById("beerPct").value = "";
+  const status = document.getElementById("beerStatus");
+  status.textContent = "";
+  try { await addBeer(); }
+  catch { status.textContent = "Beer wasn't added. Tap again to retry."; }
 });
 
 // ---- Load live matchup + rosters ----
 async function loadMatchup() {
+  if (matchupLoading) return;
+  matchupLoading = true;
   try {
     const { data } = await getMatchup();
     renderMatchup(data);
+    document.getElementById("matchupError").style.display = "none";
   } catch (err) {
     console.error("getMatchup failed:", err);
     document.getElementById("matchupError").textContent =
       "Couldn't load live matchup data. " + (err.message || "");
     document.getElementById("matchupError").style.display = "block";
-  }
+  } finally { matchupLoading = false; }
 }
 
 function renderMatchup(data) {
@@ -81,17 +68,10 @@ function renderMatchup(data) {
     document.getElementById("teamBPlayoff").textContent = `${b.roughPlayoffPct}%`;
   }
 
+  document.getElementById("teamAScore").classList.remove("leading");
+  document.getElementById("teamBScore").classList.remove("leading");
   const leadingKey = (a?.score ?? 0) >= (b?.score ?? 0) ? "teamAScore" : "teamBScore";
   document.getElementById(leadingKey).classList.add("leading");
-
-  // if (data.spread) {
-  //   document.getElementById("spreadVal").textContent = data.spread.favorite
-  //     ? `${data.spread.favorite} -${data.spread.amount.toFixed(1)}`
-  //     : "PICK 'EM";
-  // }
-  // if (data.overUnder != null) {
-  //   document.getElementById("ouVal").textContent = data.overUnder.toFixed(1);
-  // }
 
   if (a) {
     document.getElementById("pfNameA").textContent = a.name;
@@ -102,8 +82,6 @@ function renderMatchup(data) {
     document.getElementById("pfBarB").style.width = `${b.roughPlayoffPct}%`;
   }
 
-  console.log("ROSTER A DATA:", data.rosterA);
-  console.log("ROSTER B DATA:", data.rosterB);
 
   renderRoster("rosterA", data.rosterA);
   renderRoster("rosterB", data.rosterB);
@@ -130,12 +108,14 @@ function renderRoster(tableId, players) {
   sortedPlayers.forEach((p) => {
     const row = document.createElement("tr");
 
-    row.innerHTML = `
-      <td>${p.name}</td>
-      <td>${p.position || "—"}</td>
-      <td class="mins">${p.left || "—"}</td>
-      <td class="pts">${p.points.toFixed(1)}</td>
-    `;
+    const values = [p.name, p.position || "—", p.left || "—", Number(p.points || 0).toFixed(1)];
+    values.forEach((value, index) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      if (index === 2) cell.className = "mins";
+      if (index === 3) cell.className = "pts";
+      row.appendChild(cell);
+    });
 
     tbody.appendChild(row);
   });
@@ -151,12 +131,21 @@ function watchConfig() {
     updateCountdown();
     if (currentConfig.spinLocked) {
       showLockedResult(currentConfig.spinResult);
+    } else {
+      document.getElementById("spinResult").textContent = "";
+      document.getElementById("uploadSection").style.display = "none";
+      document.getElementById("spinBtn").disabled = false;
+      document.getElementById("loginBtn").textContent = "UNLOCK WHEEL";
     }
   });
 }
 
 function updateCountdown() {
-  if (!currentConfig?.revealAt) return;
+  clearInterval(countdownTimer);
+  if (!currentConfig?.revealAt) {
+    ["cd-d", "cd-h", "cd-m", "cd-s"].forEach(id => { document.getElementById(id).textContent = "--"; });
+    return;
+  }
   const target = currentConfig.revealAt.toDate
     ? currentConfig.revealAt.toDate()
     : new Date(currentConfig.revealAt);
@@ -169,8 +158,7 @@ function updateCountdown() {
     document.getElementById("cd-s").textContent = String(Math.floor(diff / 1e3) % 60).padStart(2, "0");
   }
   tick();
-  clearInterval(window.__countdownTimer);
-  window.__countdownTimer = setInterval(tick, 1000);
+  countdownTimer = setInterval(tick, 1000);
 }
 
 // ---- Wheel ----
@@ -185,6 +173,12 @@ function buildWheel(labels) {
   const wheel = document.getElementById("wheel");
   wheel.innerHTML = "";
   const cx = 150, cy = 150, r = 145, n = Math.max(labels.length, 1);
+  if (!labels.length) {
+    const circle = document.createElementNS(svgNS, "circle");
+    circle.setAttribute("cx", cx); circle.setAttribute("cy", cy); circle.setAttribute("r", r);
+    circle.setAttribute("fill", "#1D5CD1"); wheel.appendChild(circle);
+    return;
+  }
   const colors = ["#1D5CD1", "#E8A93B"];
  
   // Fewer wedges = more angular room per wedge = can fit bigger text/wider lines.
@@ -199,7 +193,9 @@ function buildWheel(labels) {
     const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
     const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
     const path = document.createElementNS(svgNS, "path");
-    path.setAttribute("d", `M${cx},${cy} L${x0},${y0} A${r},${r} 0 0 1 ${x1},${y1} Z`);
+    path.setAttribute("d", n === 1
+      ? `M${cx},${cy-r} A${r},${r} 0 1 1 ${cx},${cy+r} A${r},${r} 0 1 1 ${cx},${cy-r} Z`
+      : `M${cx},${cy} L${x0},${y0} A${r},${r} 0 ${n === 2 ? 1 : 0} 1 ${x1},${y1} Z`);
     path.setAttribute("fill", color);
     path.setAttribute("stroke", "#fff");
     path.setAttribute("stroke-width", "2");
@@ -208,7 +204,7 @@ function buildWheel(labels) {
     const lines = wrapLabel(label, maxCharsPerLine, maxLines);
     const mid = (a0 + a1) / 2;
     const lx = cx + r * 0.64 * Math.cos(mid), ly = cy + r * 0.64 * Math.sin(mid);
-    const rotateDeg = (mid * 180) / Math.PI + 90;
+    const rotateDeg = n === 1 ? 0 : (mid * 180) / Math.PI + 90;
  
     const text = document.createElementNS(svgNS, "text");
     text.setAttribute("x", lx);
@@ -236,7 +232,7 @@ function buildWheel(labels) {
 // truncating with an ellipsis only in the rare case it still overflows
 // the max number of lines for this wheel size.
 function wrapLabel(label, maxChars, maxLines) {
-  const words = label.split(" ");
+  const words = String(label || "").trim().split(/\s+/);
   const lines = [];
   let current = "";
   for (const word of words) {
@@ -244,20 +240,15 @@ function wrapLabel(label, maxChars, maxLines) {
     if (candidate.length > maxChars && current) {
       lines.push(current);
       current = word;
-    } else {
-      current = candidate;
-    }
-    if (lines.length === maxLines - 1) break;
+    } else { current = candidate; }
   }
   if (current) lines.push(current);
-  if (lines.length > maxLines) lines.length = maxLines;
-  const last = lines.length - 1;
-  if (lines[last] && lines[last].length > maxChars) {
-    lines[last] = lines[last].slice(0, maxChars - 1) + "\u2026";
-  }
-  return lines;
+  const truncated = lines.length > maxLines;
+  const result = lines.slice(0, maxLines).map(line => line.length > maxChars ? line.slice(0, maxChars - 1) + "…" : line);
+  if (truncated) result[maxLines - 1] = result[maxLines - 1].slice(0, maxChars - 1) + "…";
+  return result;
 }
- 
+
 function spinWheelToIndex(index, total) {
   const segAngle = 360 / total;
   const targetAngle = 360 * 6 - index * segAngle - segAngle / 2;
@@ -271,9 +262,10 @@ document.getElementById("unlockBtn").addEventListener("click", async () => {
   errEl.textContent = "";
   try {
     await verifyWeeklyPassword({ password });
-    document.getElementById("unlockedArea").style.display = "block";
+    document.getElementById("unlockedArea").style.display = currentConfig?.spinLocked ? "none" : "block";
+    if (currentConfig?.spinLocked) document.getElementById("lockOverlay").classList.remove("show");
     document.getElementById("pwGate").style.display = "none";
-    window.__spinPassword = password;
+    spinPassword = password;
   } catch (err) {
     errEl.textContent = err.message || "Incorrect password.";
   }
@@ -283,7 +275,7 @@ document.getElementById("spinBtn").addEventListener("click", async () => {
   const btn = document.getElementById("spinBtn");
   btn.disabled = true;
   try {
-    const { data } = await spinWheelFn({ password: window.__spinPassword });
+    const { data } = await spinWheelFn({ password: spinPassword });
     spinWheelToIndex(data.index, punishmentList.length);
     setTimeout(() => {
       document.getElementById("lockOverlay").classList.remove("show");
@@ -298,6 +290,7 @@ document.getElementById("spinBtn").addEventListener("click", async () => {
 function showLockedResult(resultText) {
   document.getElementById("spinResult").textContent = "LANDED ON: " + (resultText || "").toUpperCase();
   document.getElementById("uploadSection").style.display = "block";
+  document.getElementById("loginBtn").textContent = "UNLOCK VIDEO UPLOAD";
 }
 
 document.getElementById("uploadBtn")?.addEventListener("click", async () => {
@@ -309,11 +302,12 @@ document.getElementById("uploadBtn")?.addEventListener("click", async () => {
   status.textContent = "Uploading…";
   try {
     const { data } = await getUploadUrlFn({
-      password: window.__spinPassword,
+      password: spinPassword,
       fileName: file.name,
-      contentType: file.type
+      contentType: file.type || "video/mp4"
     });
-    await fetch(data.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+    const upload = await fetch(data.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type || "video/mp4" }, body: file });
+    if (!upload.ok) throw new Error("Storage rejected the upload. Please try again.");
     status.textContent = "Uploaded! You're off the hook — for this week.";
   } catch (err) {
     status.textContent = "Upload failed: " + (err.message || "");
@@ -321,7 +315,11 @@ document.getElementById("uploadBtn")?.addEventListener("click", async () => {
 });
 
 document.getElementById("loginBtn").addEventListener("click", () => {
+  document.getElementById("pwGate").style.display = "block";
+  document.getElementById("unlockedArea").style.display = "none";
+  document.getElementById("pwError").textContent = "";
   document.getElementById("lockOverlay").classList.add("show");
+  document.getElementById("pwInput").focus();
 });
 document.querySelectorAll(".lock-close").forEach((el) =>
   el.addEventListener("click", () => document.getElementById("lockOverlay").classList.remove("show"))
@@ -329,6 +327,6 @@ document.querySelectorAll(".lock-close").forEach((el) =>
 
 loadMatchup();
 watchConfig();
-loadPunishmentLabels();
+loadPunishmentLabels().catch(() => { document.getElementById("spinResult").textContent = "Could not load the wheel. Refresh to retry."; });
 setInterval(loadMatchup, 30000);
 watchBeerCounter();

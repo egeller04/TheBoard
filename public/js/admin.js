@@ -1,8 +1,9 @@
-import { auth, db } from "./firebase-init.js";
+import { httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
+import { auth, db, functions } from "./firebase-init.js";
 import { signInWithEmailAndPassword, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, Timestamp, onSnapshot
+  doc, getDoc, setDoc, updateDoc, collection, getDocs, addDoc, deleteDoc, Timestamp, onSnapshot, writeBatch, deleteField
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, getDownloadURL }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
@@ -20,98 +21,54 @@ document.getElementById("loginSubmit").addEventListener("click", async () => {
   }
 });
 
-onAuthStateChanged(auth, (user) => {
-  document.getElementById("loginScreen").style.display = user ? "none" : "block";
-  document.getElementById("adminBody").style.display = user ? "block" : "none";
-  if (user) {
-    loadWeekConfig();
-    loadPunishments();
+onAuthStateChanged(auth, async (user) => {
+  const isAdmin = user && (await user.getIdTokenResult()).claims.admin === true;
+  if (user && !isAdmin) document.getElementById("loginStatus").textContent = "This account does not have admin access.";
+  document.getElementById("loginScreen").style.display = isAdmin ? "none" : "block";
+  document.getElementById("adminBody").style.display = isAdmin ? "block" : "none";
+  stopBeerCounter?.();
+  if (isAdmin) {
+    loadWeekConfig().catch(error => { document.getElementById("weekStatus").textContent = error.message; });
+    loadPunishments().catch(error => { document.getElementById("punishmentStatus").textContent = error.message; });
     watchBeerCounterAdmin();
   }
 });
 
-// ---- Beer counter override ----
-// ---- Beer counter override ----
-const STANDARD_BEER_ALCOHOL_OZ = 0.6;
-
+// ---- Whole-beer counter override ----
+let stopBeerCounter;
 function watchBeerCounterAdmin() {
-  onSnapshot(doc(db, "stats", "beerCounter"), (snap) => {
-    if (!snap.exists()) {
-      document.getElementById("beerCountText").textContent =
-        "Current total: 0 beers";
-      document.getElementById("beerCountInput").value = 0;
-      return;
-    }
-
-    const data = snap.data();
-
-    // Use totalAlcoholOz as the source of truth for what is displayed
-    const totalAlcoholOz = Number(data.totalAlcoholOz || 0);
-    const standardBeers = totalAlcoholOz / STANDARD_BEER_ALCOHOL_OZ;
-
-    document.getElementById("beerCountText").textContent =
-      `Current total: ${Math.round(standardBeers)} beers`;
-
-    document.getElementById("beerCountInput").value =
-      Math.round(standardBeers);
-  });
+  stopBeerCounter?.();
+  stopBeerCounter = onSnapshot(doc(db, "stats", "beerCounter"), (snap) => {
+    const count = Math.max(0, Math.round(Number(snap.data()?.count) || 0));
+    document.getElementById("beerCountText").textContent = `Current total: ${count} beers`;
+    document.getElementById("beerCountInput").value = count;
+  }, error => { document.getElementById("beerCountStatus").textContent = error.message; });
 }
-
 document.getElementById("saveBeerCountBtn").addEventListener("click", async () => {
   const status = document.getElementById("beerCountStatus");
-
-  const newBeers = Number(
-    document.getElementById("beerCountInput").value
-  );
-
-  if (!Number.isInteger(newBeers) || newBeers < 0) {
-    status.textContent = "Enter a whole number.";
+  const input = document.getElementById("beerCountInput");
+  const count = Number(input.value);
+  if (!input.value.trim() || !Number.isSafeInteger(count) || count < 0) {
+    status.textContent = "Enter a nonnegative whole number.";
     return;
   }
-
-  const totalAlcoholOz = newBeers * STANDARD_BEER_ALCOHOL_OZ;
-
-  console.log("ADMIN BEER UPDATE");
-  console.log("count:", newBeers);
-  console.log("totalAlcoholOz:", totalAlcoholOz);
-
   try {
-    const beerRef = doc(db, "stats", "beerCounter");
-
-    await setDoc(
-      beerRef,
-      {
-        count: newBeers,
-        totalAlcoholOz: totalAlcoholOz
-      },
-      { merge: true }
-    );
-
-    // Immediately read it back from Firestore
-    const verifySnap = await getDoc(beerRef);
-
-    console.log("FIRESTORE AFTER SAVE:", verifySnap.data());
-
-    status.textContent =
-      `Updated to ${newBeers} beers (${totalAlcoholOz.toFixed(1)} oz alcohol).`;
-
-  } catch (err) {
-    console.error("Beer counter update failed:", err);
-    status.textContent = "Error: " + err.message;
-  }
+    await setDoc(doc(db, "stats", "beerCounter"), { count });
+    status.textContent = `Updated to ${count} beers.`;
+  } catch (error) { status.textContent = error.message; }
 });
 
 // ---- Week config ----
 async function loadWeekConfig() {
-  const snap = await getDoc(doc(db, "config", "current"));
+  const [snap, secret] = await Promise.all([getDoc(doc(db, "config", "current")), getDoc(doc(db, "config", "private"))]);
   const c = snap.exists() ? snap.data() : {};
   document.getElementById("weekNumber").value = c.week || "";
   document.getElementById("teamAId").value = c.teamAId || "";
   document.getElementById("teamBId").value = c.teamBId || "";
-  document.getElementById("weeklyPassword").value = c.weeklyPassword || "";
+  document.getElementById("weeklyPassword").value = secret.data()?.weeklyPassword || "";
   if (c.revealAt?.toDate) {
     const d = c.revealAt.toDate();
-    document.getElementById("revealAt").value = d.toISOString().slice(0, 16);
+    document.getElementById("revealAt").value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   }
   document.getElementById("wheelStatusText").textContent = c.spinLocked
     ? `Spun — landed on: "${c.spinResult}"${c.videoStoragePath ? " (video uploaded)" : " (no video yet)"}`
@@ -122,13 +79,20 @@ document.getElementById("saveWeekBtn").addEventListener("click", async () => {
   const status = document.getElementById("weekStatus");
   try {
     const revealVal = document.getElementById("revealAt").value;
-    await setDoc(doc(db, "config", "current"), {
-      week: Number(document.getElementById("weekNumber").value),
-      teamAId: Number(document.getElementById("teamAId").value),
-      teamBId: Number(document.getElementById("teamBId").value),
-      weeklyPassword: document.getElementById("weeklyPassword").value,
+    const week = Number(document.getElementById("weekNumber").value);
+    const teamAId = Number(document.getElementById("teamAId").value);
+    const teamBId = Number(document.getElementById("teamBId").value);
+    if (![week, teamAId, teamBId].every(value => Number.isInteger(value) && value > 0) || teamAId === teamBId) {
+      throw new Error("Enter a positive week and two different team IDs.");
+    }
+    const batch = writeBatch(db);
+    batch.set(doc(db, "config", "current"), {
+      week, teamAId, teamBId,
+      weeklyPassword: deleteField(),
       revealAt: revealVal ? Timestamp.fromDate(new Date(revealVal)) : null
     }, { merge: true });
+    batch.set(doc(db, "config", "private"), { weeklyPassword: document.getElementById("weeklyPassword").value }, { merge: true });
+    await batch.commit();
     status.textContent = "Saved.";
   } catch (err) {
     status.textContent = "Error: " + err.message;
@@ -145,7 +109,7 @@ document.getElementById("resetWheelBtn").addEventListener("click", async () => {
       videoStoragePath: null
     });
     status.textContent = "Wheel reset.";
-    loadWeekConfig();
+    await loadWeekConfig();
   } catch (err) {
     status.textContent = "Error: " + err.message;
   }
@@ -162,13 +126,19 @@ async function loadPunishments() {
 function punishmentRow(id, text) {
   const row = document.createElement("div");
   row.className = "punishment-row";
-  row.innerHTML = `<input type="text" value="${text.replace(/"/g, "&quot;")}" data-id="${id}"><button>Remove</button>`;
+  const input = document.createElement("input");
+  input.value = String(text || "");
+  input.dataset.id = id;
+  const button = document.createElement("button");
+  button.textContent = "Remove";
+  row.append(input, button);
   row.querySelector("input").addEventListener("change", async (e) => {
-    await updateDoc(doc(db, "punishments", id), { text: e.target.value });
+    try { await updateDoc(doc(db, "punishments", id), { text: e.target.value }); }
+    catch (error) { document.getElementById("punishmentStatus").textContent = error.message; }
   });
   row.querySelector("button").addEventListener("click", async () => {
-    await deleteDoc(doc(db, "punishments", id));
-    row.remove();
+    try { await deleteDoc(doc(db, "punishments", id)); row.remove(); }
+    catch (error) { document.getElementById("punishmentStatus").textContent = error.message; }
   });
   return row;
 }
@@ -201,7 +171,8 @@ document.getElementById("archiveBtn").addEventListener("click", async () => {
       }
     }
 
-    await addDoc(collection(db, "history"), {
+    const batch = writeBatch(db);
+    batch.set(doc(collection(db, "history")), {
       week: config.week || Number(document.getElementById("weekNumber").value),
       winnerName: document.getElementById("archWinnerName").value,
       winnerScore: Number(document.getElementById("archWinnerScore").value),
@@ -213,16 +184,30 @@ document.getElementById("archiveBtn").addEventListener("click", async () => {
       videoUrl
     });
 
-    await updateDoc(doc(db, "config", "current"), {
+    batch.update(doc(db, "config", "current"), {
       spinLocked: false,
       spinResult: null,
       spinResultIndex: null,
       videoStoragePath: null
     });
 
+    await batch.commit();
     status.textContent = "Archived to Past Games. Set up next week's matchup above.";
-    loadWeekConfig();
+    await loadWeekConfig();
   } catch (err) {
     status.textContent = "Error: " + err.message;
   }
+});
+document.getElementById("createInviteBtn").addEventListener("click", async () => {
+  const status = document.getElementById("inviteStatus");
+  const button = document.getElementById("createInviteBtn");
+  button.disabled = true;
+  try {
+    const { data } = await httpsCallable(functions, "createInvitation")({ cooldownSeconds: Number(document.getElementById("inviteCooldown").value) });
+    const url = new URL("login.html", location.href);
+    url.hash = new URLSearchParams({ invite: data.token }).toString();
+    document.getElementById("inviteLink").value = url.href;
+    status.textContent = "Send this link to your group. It expires in 7 days, with a " + document.getElementById("inviteCooldown").selectedOptions[0].textContent + " cooldown between successful signups.";
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
 });

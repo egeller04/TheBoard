@@ -1,13 +1,16 @@
 {
   "name": "functions",
-  "description": "The Board — Game of the Week backend",
+  "description": "The Board \u2014 Game of the Week backend",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {
     "firebase-admin": "^12.1.0",
     "firebase-functions": "^5.0.0"
   },
-  "private": true
+  "private": true,
+  "scripts": {
+    "test": "node test/auth-counter.test.cjs"
+  }
 }
